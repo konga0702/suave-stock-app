@@ -154,29 +154,41 @@ export function TransactionFormPage() {
         return
       }
 
-      const { data } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .eq('internal_id', value.trim())
-        .limit(1)
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('internal_id', value.trim())
+          .limit(1)
 
-      if (!data || data.length === 0) {
-        setTrackingStatus('not_found')
-        return
-      }
+        if (error) {
+          console.warn('inventory_items query failed:', error.message)
+          // テーブルが存在しない場合（マイグレーション未実行）は静かにスキップ
+          setTrackingStatus(null)
+          return
+        }
 
-      const item = data[0]
-      if (item.status === 'SHIPPED') {
-        setTrackingStatus('already_shipped')
-      } else {
-        setTrackingStatus('valid')
-        const product = products.find((p) => p.id === item.product_id)
-        if (product) {
-          const alreadyAdded = items.find((i) => i.product_id === product.id)
-          if (!alreadyAdded) {
-            addItem(product)
+        if (!data || data.length === 0) {
+          setTrackingStatus('not_found')
+          return
+        }
+
+        const item = data[0]
+        if (item.status === 'SHIPPED') {
+          setTrackingStatus('already_shipped')
+        } else {
+          setTrackingStatus('valid')
+          const product = products.find((p) => p.id === item.product_id)
+          if (product) {
+            const alreadyAdded = items.find((i) => i.product_id === product.id)
+            if (!alreadyAdded) {
+              addItem(product)
+            }
           }
         }
+      } catch {
+        console.warn('checkInternalId error')
+        setTrackingStatus(null)
       }
     },
     [type, products, items, addItem]
