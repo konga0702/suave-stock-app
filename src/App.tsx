@@ -6,6 +6,7 @@ import { ProductFormPage } from '@/pages/ProductFormPage'
 import { TransactionsPage } from '@/pages/TransactionsPage'
 import { TransactionFormPage } from '@/pages/TransactionFormPage'
 import { TransactionDetailPage } from '@/pages/TransactionDetailPage'
+import { InventoryPage } from '@/pages/InventoryPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/transactions/new" element={<TransactionFormPage />} />
           <Route path="/transactions/:id" element={<TransactionDetailPage />} />
           <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
         </Routes>
       </Layout>
       <Toaster position="top-center" richColors />

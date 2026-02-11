@@ -53,7 +53,7 @@ export function TransactionDetailPage() {
     load()
   }, [id])
 
-  // 予定完了 → 在庫反映
+  // 予定完了 → 在庫反映 + 個体追跡登録
   const handleComplete = async () => {
     if (!tx || !id) return
     setCompleting(true)
@@ -73,6 +73,35 @@ export function TransactionDetailPage() {
           .from('products')
           .update({ current_stock: newStock })
           .eq('id', item.product_id)
+      }
+
+      // 個体追跡 (inventory_items) への登録/更新
+      if (tx.tracking_number) {
+        if (tx.type === 'IN') {
+          // 入庫完了 → inventory_items に IN_STOCK として登録
+          // 明細の各商品ごとにレコードを作成
+          for (const item of items) {
+            await supabase.from('inventory_items').insert({
+              product_id: item.product_id,
+              tracking_number: tx.tracking_number,
+              status: 'IN_STOCK',
+              in_transaction_id: id,
+              in_date: tx.date,
+              partner_name: tx.partner_name,
+            })
+          }
+        } else {
+          // 出庫完了 → 該当 tracking_number の inventory_items を SHIPPED に更新
+          await supabase
+            .from('inventory_items')
+            .update({
+              status: 'SHIPPED',
+              out_transaction_id: id,
+              out_date: tx.date,
+            })
+            .eq('tracking_number', tx.tracking_number)
+            .eq('status', 'IN_STOCK')
+        }
       }
 
       // ステータス更新
@@ -209,7 +238,7 @@ export function TransactionDetailPage() {
             {tx.tracking_number && (
               <div>
                 <span className="text-muted-foreground">管理番号: </span>
-                {tx.tracking_number}
+                <span className="font-mono">{tx.tracking_number}</span>
               </div>
             )}
             {tx.partner_name && (
@@ -268,7 +297,11 @@ export function TransactionDetailPage() {
               <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
               <AlertDialogDescription>
                 在庫数が{tx.type === 'IN' ? '増加' : '減少'}します。
-                この操作後も編集・削除は可能です。
+                {tx.tracking_number && (
+                  tx.type === 'IN'
+                    ? ' 管理番号が個体追跡に登録されます。'
+                    : ' 管理番号が出荷済みに更新されます。'
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

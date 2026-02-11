@@ -38,3 +38,21 @@ export interface TransactionItem {
   created_at: string
   product?: Product
 }
+
+export type InventoryItemStatus = 'IN_STOCK' | 'SHIPPED'
+
+export interface InventoryItem {
+  id: string
+  product_id: string
+  tracking_number: string
+  status: InventoryItemStatus
+  in_transaction_id: string | null
+  out_transaction_id: string | null
+  in_date: string
+  out_date: string | null
+  partner_name: string | null
+  memo: string | null
+  created_at: string
+  updated_at: string
+  product?: Product
+}
