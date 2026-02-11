@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, ScanBarcode, Barcode, Upload, Download } from 'lucide-react'
+import { Plus, Search, ScanBarcode, Barcode, Upload, Download, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -68,18 +68,24 @@ export function ProductsPage() {
     input.click()
   }
 
+  const getStockColor = (stock: number) => {
+    if (stock === 0) return 'bg-red-100 text-red-700'
+    if (stock <= 5) return 'bg-amber-100 text-amber-700'
+    return 'bg-emerald-100 text-emerald-700'
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">商品一覧</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleImport} title="CSVインポート">
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={handleImport} title="CSVインポート">
             <Upload className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => exportProductsCsv(products)} title="CSVエクスポート">
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => exportProductsCsv(products)} title="CSVエクスポート">
             <Download className="h-4 w-4" />
           </Button>
-          <Button asChild size="icon">
+          <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 shadow-sm">
             <Link to="/products/new">
               <Plus className="h-4 w-4" />
             </Link>
@@ -94,10 +100,10 @@ export function ProductsPage() {
             placeholder="商品名 or バーコード検索"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="rounded-xl pl-9"
           />
         </div>
-        <Button variant="outline" size="icon" onClick={() => setScanning(true)}>
+        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => setScanning(true)}>
           <ScanBarcode className="h-4 w-4" />
         </Button>
       </div>
@@ -108,43 +114,51 @@ export function ProductsPage() {
 
       <div className="space-y-2">
         {filtered.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            商品が見つかりません
-          </p>
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <Package className="h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">
+              商品が見つかりません
+            </p>
+          </div>
         ) : (
           filtered.map((product) => (
-            <Card key={product.id} className="relative">
-              <CardContent className="flex items-center gap-3 p-3">
+            <Card key={product.id} className="border-0 shadow-sm transition-all hover:shadow-md">
+              <CardContent className="flex items-center gap-3 p-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
+                  <Package className="h-5 w-5 text-teal-500" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <Link
                     to={`/products/${product.id}/edit`}
-                    className="block font-medium hover:underline truncate"
+                    className="block text-sm font-semibold hover:text-indigo-600 truncate transition-colors"
                   >
                     {product.name}
                   </Link>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                     {product.internal_barcode && (
-                      <span className="font-mono">{product.internal_barcode}</span>
+                      <span className="font-mono text-[11px]">{product.internal_barcode}</span>
                     )}
-                    <span>¥{Number(product.default_unit_price).toLocaleString()}</span>
+                    <span className="text-indigo-500 font-medium">¥{Number(product.default_unit_price).toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold">
-                    {product.current_stock}
+                <div className="flex items-center gap-2">
+                  <div className={`rounded-lg px-2.5 py-1 text-center ${getStockColor(product.current_stock)}`}>
+                    <div className="text-base font-bold leading-tight">
+                      {product.current_stock}
+                    </div>
+                    <div className="text-[9px] font-medium leading-tight">在庫</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">在庫</div>
+                  {product.internal_barcode && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-indigo-600"
+                      onClick={() => setBarcodeProduct(product)}
+                    >
+                      <Barcode className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                {product.internal_barcode && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setBarcodeProduct(product)}
-                  >
-                    <Barcode className="h-4 w-4" />
-                  </Button>
-                )}
               </CardContent>
             </Card>
           ))

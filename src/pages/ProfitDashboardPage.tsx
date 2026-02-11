@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { TrendingUp, TrendingDown, DollarSign, Percent } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { TrendingUp, TrendingDown, DollarSign, Percent, CalendarDays } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -43,13 +43,11 @@ export function ProfitDashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // 期間条件を設定
       let fromDate: string | null = null
       let toDate: string | null = null
 
       if (periodType === 'month') {
         fromDate = `${month}-01`
-        // 月末日の計算
         const [y, m] = month.split('-').map(Number)
         const lastDay = new Date(y, m, 0).getDate()
         toDate = `${month}-${String(lastDay).padStart(2, '0')}`
@@ -58,7 +56,6 @@ export function ProfitDashboardPage() {
         toDate = dateTo || null
       }
 
-      // 完了済み入庫（仕入れ）の合計
       let inQuery = supabase
         .from('transactions')
         .select('total_amount')
@@ -68,7 +65,6 @@ export function ProfitDashboardPage() {
       if (toDate) inQuery = inQuery.lte('date', toDate)
       const { data: inData } = await inQuery
 
-      // 完了済み出庫（売上）の合計
       let outQuery = supabase
         .from('transactions')
         .select('total_amount')
@@ -109,35 +105,47 @@ export function ProfitDashboardPage() {
   }, [loadData])
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold">利益ダッシュボード</h1>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 p-5 text-white shadow-lg">
+        <div className="relative z-10">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            <h1 className="text-lg font-bold">利益ダッシュボード</h1>
+          </div>
+          <p className="mt-1 text-sm text-white/80">
+            売上・仕入れ・利益を一覧で確認
+          </p>
+        </div>
+        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
+        <div className="absolute -bottom-4 -right-2 h-16 w-16 rounded-full bg-white/10" />
+      </div>
 
       {/* 期間フィルター */}
-      <Card>
+      <Card className="border-0 shadow-sm">
         <CardContent className="space-y-3 p-4">
-          <div className="space-y-1">
-            <Label className="text-xs">期間</Label>
-            <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全期間</SelectItem>
-                <SelectItem value="month">月別</SelectItem>
-                <SelectItem value="custom">カスタム期間</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-teal-500" />
+            <Label className="text-sm font-semibold">期間</Label>
           </div>
+          <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
+            <SelectTrigger className="rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全期間</SelectItem>
+              <SelectItem value="month">月別</SelectItem>
+              <SelectItem value="custom">カスタム期間</SelectItem>
+            </SelectContent>
+          </Select>
 
           {periodType === 'month' && (
-            <div className="space-y-1">
-              <Label className="text-xs">月を選択</Label>
-              <Input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-              />
-            </div>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="rounded-xl"
+            />
           )}
 
           {periodType === 'custom' && (
@@ -148,6 +156,7 @@ export function ProfitDashboardPage() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-xl"
                 />
               </div>
               <div className="space-y-1">
@@ -156,6 +165,7 @@ export function ProfitDashboardPage() {
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-xl"
                 />
               </div>
             </div>
@@ -171,90 +181,127 @@ export function ProfitDashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">総売上</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  ¥{data.totalSales.toLocaleString()}
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-muted-foreground">総売上</p>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-emerald-600">
+                    ¥{data.totalSales.toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    出庫 {data.outCount}件
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  出庫 {data.outCount}件
-                </p>
+                <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-400" />
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">総仕入れ</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  ¥{data.totalCost.toLocaleString()}
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-muted-foreground">総仕入れ</p>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50">
+                      <TrendingDown className="h-4 w-4 text-red-500" />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-red-600">
+                    ¥{data.totalCost.toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    入庫 {data.inCount}件
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  入庫 {data.inCount}件
-                </p>
+                <div className="h-1 bg-gradient-to-r from-red-400 to-rose-400" />
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">粗利</CardTitle>
-                <DollarSign className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${
-                  data.grossProfit >= 0 ? 'text-blue-600' : 'text-red-600'
-                }`}>
-                  ¥{data.grossProfit.toLocaleString()}
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-muted-foreground">粗利</p>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
+                      <DollarSign className="h-4 w-4 text-indigo-500" />
+                    </div>
+                  </div>
+                  <p className={`text-xl font-bold ${
+                    data.grossProfit >= 0 ? 'text-indigo-600' : 'text-red-600'
+                  }`}>
+                    ¥{data.grossProfit.toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    売上 - 仕入れ
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  売上 - 仕入れ
-                </p>
+                <div className={`h-1 ${
+                  data.grossProfit >= 0
+                    ? 'bg-gradient-to-r from-indigo-400 to-violet-400'
+                    : 'bg-gradient-to-r from-red-400 to-rose-400'
+                }`} />
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">粗利益率</CardTitle>
-                <Percent className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${
-                  data.profitMargin >= 0 ? 'text-purple-600' : 'text-red-600'
-                }`}>
-                  {data.profitMargin.toFixed(1)}%
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-muted-foreground">粗利益率</p>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
+                      <Percent className="h-4 w-4 text-purple-500" />
+                    </div>
+                  </div>
+                  <p className={`text-xl font-bold ${
+                    data.profitMargin >= 0 ? 'text-purple-600' : 'text-red-600'
+                  }`}>
+                    {data.profitMargin.toFixed(1)}%
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    粗利 ÷ 売上
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  粗利 ÷ 売上
-                </p>
+                <div className={`h-1 ${
+                  data.profitMargin >= 0
+                    ? 'bg-gradient-to-r from-purple-400 to-fuchsia-400'
+                    : 'bg-gradient-to-r from-red-400 to-rose-400'
+                }`} />
               </CardContent>
             </Card>
           </div>
 
           {/* サマリー */}
-          <Card>
+          <Card className="border-0 shadow-sm">
             <CardContent className="p-4">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">総売上（出庫完了分）</span>
-                  <span className="font-medium text-green-600">
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="text-muted-foreground">総売上（出庫完了分）</span>
+                  </div>
+                  <span className="font-semibold text-emerald-600">
                     +¥{data.totalSales.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">総仕入れ（入庫完了分）</span>
-                  <span className="font-medium text-red-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    <span className="text-muted-foreground">総仕入れ（入庫完了分）</span>
+                  </div>
+                  <span className="font-semibold text-red-600">
                     -¥{data.totalCost.toLocaleString()}
                   </span>
                 </div>
-                <div className="border-t pt-2 flex justify-between font-medium">
-                  <span>粗利益</span>
-                  <span className={data.grossProfit >= 0 ? 'text-blue-600' : 'text-red-600'}>
+                <div className="border-t pt-3 flex items-center justify-between font-semibold">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${data.grossProfit >= 0 ? 'bg-indigo-500' : 'bg-red-500'}`} />
+                    <span>粗利益</span>
+                  </div>
+                  <span className={`text-base ${data.grossProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
                     ¥{data.grossProfit.toLocaleString()}
                   </span>
                 </div>

@@ -3,11 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { Package, ArrowLeftRight, LayoutDashboard, ScanSearch, TrendingUp } from 'lucide-react'
 
 const navItems = [
-  { path: '/', label: 'ホーム', icon: LayoutDashboard },
-  { path: '/products', label: '商品', icon: Package },
-  { path: '/transactions', label: '入出庫', icon: ArrowLeftRight },
-  { path: '/inventory', label: '追跡', icon: ScanSearch },
-  { path: '/profit', label: '利益', icon: TrendingUp },
+  { path: '/', label: 'ホーム', icon: LayoutDashboard, color: 'text-indigo-500' },
+  { path: '/products', label: '商品', icon: Package, color: 'text-teal-500' },
+  { path: '/transactions', label: '入出庫', icon: ArrowLeftRight, color: 'text-amber-500' },
+  { path: '/inventory', label: '追跡', icon: ScanSearch, color: 'text-sky-500' },
+  { path: '/profit', label: '利益', icon: TrendingUp, color: 'text-emerald-500' },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -22,9 +22,9 @@ export function Layout({ children }: { children: ReactNode }) {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg items-center justify-around">
-          {navItems.map(({ path, label, icon: Icon }) => {
+          {navItems.map(({ path, label, icon: Icon, color }) => {
             const isActive = path === '/'
               ? location.pathname === '/'
               : location.pathname.startsWith(path)
@@ -32,13 +32,16 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link
                 key={path}
                 to={path}
-                className={`flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors ${
+                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] transition-all duration-200 ${
                   isActive
-                    ? 'text-primary font-semibold'
-                    : 'text-muted-foreground'
+                    ? `${color} font-semibold scale-105`
+                    : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                {isActive && (
+                  <span className="absolute -top-0.5 h-0.5 w-8 rounded-full bg-current" />
+                )}
+                <Icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'drop-shadow-sm' : ''}`} />
                 <span>{label}</span>
               </Link>
             )

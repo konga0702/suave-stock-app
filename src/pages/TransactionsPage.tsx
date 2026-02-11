@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download } from 'lucide-react'
+import { Plus, Upload, Download, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -59,14 +59,14 @@ export function TransactionsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">入出庫</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleImport} title="CSVインポート">
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={handleImport} title="CSVインポート">
             <Upload className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => exportTransactionsCsv(transactions)} title="CSVエクスポート">
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => exportTransactionsCsv(transactions)} title="CSVエクスポート">
             <Download className="h-4 w-4" />
           </Button>
-          <Button asChild size="icon">
+          <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 shadow-sm">
             <Link to="/transactions/new">
               <Plus className="h-4 w-4" />
             </Link>
@@ -75,40 +75,65 @@ export function TransactionsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full">
-          <TabsTrigger value="SCHEDULED" className="flex-1">予定</TabsTrigger>
-          <TabsTrigger value="COMPLETED" className="flex-1">履歴</TabsTrigger>
+        <TabsList className="w-full rounded-xl bg-muted/60">
+          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg">予定</TabsTrigger>
+          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg">履歴</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-4 space-y-2">
           {transactions.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {tab === 'SCHEDULED' ? '予定はありません' : '履歴はありません'}
-            </p>
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                {tab === 'SCHEDULED' ? (
+                  <ArrowDownToLine className="h-6 w-6 text-muted-foreground/50" />
+                ) : (
+                  <ArrowUpFromLine className="h-6 w-6 text-muted-foreground/50" />
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {tab === 'SCHEDULED' ? '予定はありません' : '履歴はありません'}
+              </p>
+            </div>
           ) : (
             transactions.map((tx) => {
               const idDisplay = getIdDisplay(tx)
+              const isIN = tx.type === 'IN'
               return (
                 <Link key={tx.id} to={`/transactions/${tx.id}`}>
-                  <Card className="mb-2 transition-colors hover:bg-accent">
-                    <CardContent className="flex items-center gap-3 p-3">
+                  <Card className="mb-2 border-0 shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="flex items-center gap-3 p-3.5">
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        isIN ? 'bg-blue-50' : 'bg-amber-50'
+                      }`}>
+                        {isIN ? (
+                          <ArrowDownToLine className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={tx.type === 'IN' ? 'default' : 'secondary'}>
-                            {tx.type === 'IN' ? '入庫' : '出庫'}
+                        <div className="flex items-center gap-1.5">
+                          <Badge className={`text-[10px] px-1.5 py-0 ${
+                            isIN
+                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                              : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                          }`}>
+                            {isIN ? '入庫' : '出庫'}
                           </Badge>
-                          <Badge variant="outline">{tx.category}</Badge>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">{tx.category}</Badge>
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{tx.date}</span>
                           {tx.partner_name && <span>· {tx.partner_name}</span>}
                         </div>
                         {idDisplay && (
-                          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                          <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/70">
                             {idDisplay}
                           </p>
                         )}
                       </div>
-                      <div className="text-right font-medium">
+                      <div className={`text-right font-bold ${
+                        isIN ? 'text-blue-600' : 'text-amber-600'
+                      }`}>
                         ¥{Number(tx.total_amount).toLocaleString()}
                       </div>
                     </CardContent>

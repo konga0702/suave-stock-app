@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, ScanBarcode, Trash2, Plus, QrCode,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -170,7 +170,6 @@ export function TransactionFormPage() {
         setTrackingStatus('already_shipped')
       } else {
         setTrackingStatus('valid')
-        // 該当商品を自動追加
         const product = products.find((p) => p.id === item.product_id)
         if (product) {
           const alreadyAdded = items.find((i) => i.product_id === product.id)
@@ -294,11 +293,12 @@ export function TransactionFormPage() {
 
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
+  const accentColor = isIN ? 'blue' : 'amber'
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-bold">
@@ -308,14 +308,19 @@ export function TransactionFormPage() {
 
       <div className="space-y-4">
         {/* ① 基本情報 */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardContent className="space-y-3 p-4">
-            <p className="text-xs font-medium text-muted-foreground">① 基本情報</p>
+            <div className="flex items-center gap-2">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
+                <span className={`text-xs font-bold text-${accentColor}-600`}>1</span>
+              </div>
+              <p className="text-sm font-semibold">基本情報</p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">タイプ</Label>
                 <Select value={type} onValueChange={(v) => setType(v as TransactionType)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -327,7 +332,7 @@ export function TransactionFormPage() {
               <div className="space-y-1">
                 <Label className="text-xs">カテゴリ</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as TransactionCategory)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -345,23 +350,30 @@ export function TransactionFormPage() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                className="rounded-xl"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* ② 商品選択 */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">② 商品を選択</p>
+              <div className="flex items-center gap-2">
+                <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
+                  <span className={`text-xs font-bold text-${accentColor}-600`}>2</span>
+                </div>
+                <p className="text-sm font-semibold">商品を選択</p>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-xl"
                 onClick={() => setScanTarget(scanTarget === 'product' ? null : 'product')}
               >
                 <ScanBarcode className="mr-1 h-3 w-3" />
-                商品スキャン
+                スキャン
               </Button>
             </div>
 
@@ -378,7 +390,7 @@ export function TransactionFormPage() {
                 if (product) addItem(product)
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="rounded-xl">
                 <SelectValue placeholder="商品を選択して追加..." />
               </SelectTrigger>
               <SelectContent>
@@ -391,53 +403,53 @@ export function TransactionFormPage() {
             </Select>
 
             {items.map((item, index) => (
-              <Card key={index} className="border-dashed">
-                <CardContent className="flex items-center gap-2 p-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.product_name}</p>
-                    <div className="mt-1 flex items-center gap-2">
+              <div key={index} className={`flex items-center gap-2 rounded-xl border p-3 ${
+                isIN ? 'border-blue-100 bg-blue-50/30' : 'border-amber-100 bg-amber-50/30'
+              }`}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{item.product_name}</p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                      className="h-8 w-14 rounded-lg text-center text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground">×</span>
+                    <div className="flex items-center gap-1">
                       <Input
                         type="number"
                         inputMode="numeric"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                        className="h-8 w-16 text-center"
+                        value={item.price}
+                        onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
+                        className="h-8 w-20 rounded-lg text-sm"
                       />
-                      <span className="text-xs text-muted-foreground">×</span>
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          value={item.price}
-                          onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
-                          className="h-8 w-24"
-                        />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {priceLabel}
-                        </span>
-                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {priceLabel}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      ¥{(item.quantity * item.price).toLocaleString()}
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-destructive"
-                      onClick={() => removeItem(index)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="text-right">
+                  <p className={`text-sm font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+                    ¥{(item.quantity * item.price).toLocaleString()}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-red-400 hover:text-red-600"
+                    onClick={() => removeItem(index)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
             ))}
 
             {items.length === 0 && (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center">
-                <Plus className="h-5 w-5 text-muted-foreground" />
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-muted-foreground/20 p-5 text-center">
+                <Plus className="h-6 w-6 text-muted-foreground/30" />
                 <p className="text-xs text-muted-foreground">
                   バーコードスキャンまたは選択で商品を追加
                 </p>
@@ -447,13 +459,21 @@ export function TransactionFormPage() {
         </Card>
 
         {/* ③ 管理番号 (3分割) */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardContent className="space-y-3 p-4">
-            <p className="text-xs font-medium text-muted-foreground">③ 管理番号</p>
+            <div className="flex items-center gap-2">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
+                <span className={`text-xs font-bold text-${accentColor}-600`}>3</span>
+              </div>
+              <p className="text-sm font-semibold">管理番号</p>
+            </div>
 
             {/* 店舗管理番号 */}
             <div className="space-y-1">
-              <Label className="text-xs">店舗管理番号</Label>
+              <div className="flex items-center gap-1.5">
+                <Store className="h-3 w-3 text-violet-500" />
+                <Label className="text-xs">店舗管理番号</Label>
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={internalId}
@@ -467,14 +487,15 @@ export function TransactionFormPage() {
                     }
                   }}
                   placeholder="店舗管理番号"
-                  className="flex-1"
+                  className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'internal_id' ? null : 'internal_id')}
                 >
-                  <QrCode className="h-4 w-4" />
+                  <QrCode className="h-4 w-4 text-violet-500" />
                 </Button>
               </div>
               {scanTarget === 'internal_id' && (
@@ -487,10 +508,10 @@ export function TransactionFormPage() {
 
             {/* 出荷時の管理番号チェック結果 */}
             {type === 'OUT' && trackingStatus && (
-              <div className={`flex items-center gap-2 rounded-md p-2 text-sm ${
+              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm ${
                 trackingStatus === 'valid'
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
               }`}>
                 {trackingStatus === 'valid' ? (
                   <>
@@ -513,20 +534,24 @@ export function TransactionFormPage() {
 
             {/* 配送追跡番号 */}
             <div className="space-y-1">
-              <Label className="text-xs">配送追跡番号</Label>
+              <div className="flex items-center gap-1.5">
+                <Truck className="h-3 w-3 text-sky-500" />
+                <Label className="text-xs">配送追跡番号</Label>
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={shippingTrackingId}
                   onChange={(e) => setShippingTrackingId(e.target.value)}
                   placeholder="配送追跡番号"
-                  className="flex-1"
+                  className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'shipping_tracking_id' ? null : 'shipping_tracking_id')}
                 >
-                  <QrCode className="h-4 w-4" />
+                  <QrCode className="h-4 w-4 text-sky-500" />
                 </Button>
               </div>
               {scanTarget === 'shipping_tracking_id' && (
@@ -539,20 +564,24 @@ export function TransactionFormPage() {
 
             {/* 注文ID */}
             <div className="space-y-1">
-              <Label className="text-xs">注文ID</Label>
+              <div className="flex items-center gap-1.5">
+                <ShoppingBag className="h-3 w-3 text-pink-500" />
+                <Label className="text-xs">注文ID</Label>
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
                   placeholder="注文ID"
-                  className="flex-1"
+                  className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'order_id' ? null : 'order_id')}
                 >
-                  <QrCode className="h-4 w-4" />
+                  <QrCode className="h-4 w-4 text-pink-500" />
                 </Button>
               </div>
               {scanTarget === 'order_id' && (
@@ -566,11 +595,16 @@ export function TransactionFormPage() {
         </Card>
 
         {/* ④ 取引先・メモ */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardContent className="space-y-3 p-4">
-            <p className="text-xs font-medium text-muted-foreground">
-              {isIN ? '④ 取引先・メモ' : '④ 顧客情報・メモ'}
-            </p>
+            <div className="flex items-center gap-2">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
+                <span className={`text-xs font-bold text-${accentColor}-600`}>4</span>
+              </div>
+              <p className="text-sm font-semibold">
+                {isIN ? '取引先・メモ' : '顧客情報・メモ'}
+              </p>
+            </div>
             <div className="space-y-1">
               <Label className="text-xs" htmlFor="partner">
                 {isIN ? '取引先 (仕入先)' : '取引先 (顧客名)'}
@@ -580,6 +614,7 @@ export function TransactionFormPage() {
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
                 placeholder={isIN ? '仕入先名' : '顧客名'}
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-1">
@@ -590,28 +625,44 @@ export function TransactionFormPage() {
                 onChange={(e) => setMemo(e.target.value)}
                 rows={2}
                 placeholder={isIN ? '入荷メモ' : '出荷メモ・配送先等'}
+                className="rounded-xl"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* 合計 */}
-        <div className="flex items-center justify-between rounded-lg bg-muted p-3">
-          <span className="font-medium">
+        <div className={`flex items-center justify-between rounded-2xl p-4 ${
+          isIN
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100'
+            : 'bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100'
+        }`}>
+          <span className="font-semibold text-sm">
             {isIN ? '合計仕入れ金額' : '合計販売金額'}
           </span>
-          <span className="text-lg font-bold">¥{totalAmount.toLocaleString()}</span>
+          <span className={`text-xl font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+            ¥{totalAmount.toLocaleString()}
+          </span>
         </div>
 
         {/* 出荷時警告 */}
         {type === 'OUT' && trackingStatus === 'already_shipped' && (
-          <div className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700">
+          <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             管理番号が出荷済みです。続行する場合は内容を確認してください。
           </div>
         )}
 
-        <Button className="w-full" size="lg" onClick={handleSave} disabled={saving}>
+        <Button
+          className={`w-full rounded-xl shadow-md ${
+            isIN
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-blue-500/25 hover:from-blue-600 hover:to-indigo-600'
+              : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/25 hover:from-amber-600 hover:to-orange-600'
+          }`}
+          size="lg"
+          onClick={handleSave}
+          disabled={saving}
+        >
           {saving ? '保存中...' : isEdit ? '更新する' : '予定として登録する'}
         </Button>
       </div>
