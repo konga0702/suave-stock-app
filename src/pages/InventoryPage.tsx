@@ -1,18 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, ScanBarcode, Package, ArrowUpFromLine, BoxSelect } from 'lucide-react'
+import { Search, Package, ArrowUpFromLine, BoxSelect } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { BarcodeScanner } from '@/components/BarcodeScanner'
+import { PhotoScanner } from '@/components/PhotoScanner'
 import { supabase } from '@/lib/supabase'
 import type { InventoryItem } from '@/types/database'
 
 export function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [search, setSearch] = useState('')
-  const [scanning, setScanning] = useState(false)
   const [tab, setTab] = useState<'IN_STOCK' | 'SHIPPED'>('IN_STOCK')
 
   const load = useCallback(async () => {
@@ -32,14 +30,6 @@ export function InventoryPage() {
   useEffect(() => {
     load()
   }, [load])
-
-  const handleBarcodeScan = useCallback(
-    (barcode: string) => {
-      setScanning(false)
-      setSearch(barcode)
-    },
-    []
-  )
 
   const filtered = items.filter((item) => {
     if (!search) return true
@@ -77,14 +67,8 @@ export function InventoryPage() {
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60"
           />
         </div>
-        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => setScanning(true)}>
-          <ScanBarcode className="h-4 w-4" />
-        </Button>
+        <PhotoScanner onScan={(barcode) => setSearch(barcode)} />
       </div>
-
-      {scanning && (
-        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setScanning(false)} />
-      )}
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'IN_STOCK' | 'SHIPPED')}>
         <TabsList className="w-full rounded-xl bg-muted/50 p-1">

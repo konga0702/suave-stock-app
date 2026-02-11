@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, ScanBarcode, Barcode, Upload, Download, Package } from 'lucide-react'
+import { Plus, Search, Barcode, Upload, Download, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { BarcodeScanner } from '@/components/BarcodeScanner'
+import { PhotoScanner } from '@/components/PhotoScanner'
 import { BarcodeDisplay } from '@/components/BarcodeDisplay'
 import { supabase } from '@/lib/supabase'
 import { exportProductsCsv, importProductsCsv } from '@/lib/csv'
@@ -20,7 +20,6 @@ import type { Product } from '@/types/database'
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [search, setSearch] = useState('')
-  const [scanning, setScanning] = useState(false)
   const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null)
 
   const loadProducts = useCallback(async () => {
@@ -39,14 +38,6 @@ export function ProductsPage() {
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.internal_barcode && p.internal_barcode.includes(search))
-  )
-
-  const handleBarcodeScan = useCallback(
-    (barcode: string) => {
-      setScanning(false)
-      setSearch(barcode)
-    },
-    []
   )
 
   const handleImport = async () => {
@@ -103,14 +94,8 @@ export function ProductsPage() {
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60 focus:border-slate-400 transition-colors"
           />
         </div>
-        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => setScanning(true)}>
-          <ScanBarcode className="h-4 w-4" />
-        </Button>
+        <PhotoScanner onScan={(barcode) => setSearch(barcode)} />
       </div>
-
-      {scanning && (
-        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setScanning(false)} />
-      )}
 
       <div className="space-y-2">
         {filtered.length === 0 ? (

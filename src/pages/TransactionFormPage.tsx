@@ -4,6 +4,7 @@ import {
   ArrowLeft, Trash2, Plus,
   AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag, ClipboardPaste,
 } from 'lucide-react'
+import { PhotoScanner } from '@/components/PhotoScanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -458,7 +459,7 @@ export function TransactionFormPage() {
                 }`}>3</span>
               </div>
               <p className="text-sm font-semibold">管理番号</p>
-              <span className="text-[10px] text-muted-foreground/60 ml-auto">QR読取値を貼り付け</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-auto">📷スキャン or 📋貼り付け</span>
             </div>
 
             {/* 店舗管理番号 */}
@@ -479,8 +480,16 @@ export function TransactionFormPage() {
                       checkInternalId(internalId)
                     }
                   }}
-                  placeholder="手入力 or 貼り付け"
+                  placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <PhotoScanner
+                  className="border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
+                  onScan={(value) => {
+                    setInternalId(value)
+                    toast.success(`読取: ${value}`)
+                    if (type === 'OUT') checkInternalId(value)
+                  }}
                 />
                 <Button
                   variant="outline"
@@ -530,8 +539,15 @@ export function TransactionFormPage() {
                 <Input
                   value={shippingTrackingId}
                   onChange={(e) => setShippingTrackingId(e.target.value)}
-                  placeholder="手入力 or 貼り付け"
+                  placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <PhotoScanner
+                  className="border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950"
+                  onScan={(value) => {
+                    setShippingTrackingId(value)
+                    toast.success(`読取: ${value}`)
+                  }}
                 />
                 <Button
                   variant="outline"
@@ -555,8 +571,15 @@ export function TransactionFormPage() {
                 <Input
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
-                  placeholder="手入力 or 貼り付け"
+                  placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <PhotoScanner
+                  className="border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950"
+                  onScan={(value) => {
+                    setOrderId(value)
+                    toast.success(`読取: ${value}`)
+                  }}
                 />
                 <Button
                   variant="outline"

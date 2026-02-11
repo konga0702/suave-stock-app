@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ScanBarcode, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste } from 'lucide-react'
+import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste } from 'lucide-react'
+import { PhotoScanner } from '@/components/PhotoScanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,7 +18,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
@@ -31,7 +31,6 @@ export function ProductFormPage() {
   const [stock, setStock] = useState('0')
   const [price, setPrice] = useState('0')
   const [memo, setMemo] = useState('')
-  const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -205,29 +204,15 @@ export function ProductFormPage() {
               >
                 <ClipboardPaste className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 rounded-xl border-border/60 hover:bg-accent transition-colors"
-                onClick={() => setScanning(!scanning)}
-                title="カメラスキャン"
-              >
-                <ScanBarcode className="h-4 w-4" />
-              </Button>
+              <PhotoScanner
+                onScan={(code) => {
+                  setBarcode(code)
+                  toast.success(`バーコード読取: ${code}`)
+                }}
+              />
             </div>
           </CardContent>
         </Card>
-
-        {scanning && (
-          <BarcodeScanner
-            onScan={(code) => {
-              setBarcode(code)
-              setScanning(false)
-              toast.success(`バーコード読取: ${code}`)
-            }}
-            onClose={() => setScanning(false)}
-          />
-        )}
 
         {/* 在庫数 & 単価 */}
         <div className="grid grid-cols-2 gap-3">
