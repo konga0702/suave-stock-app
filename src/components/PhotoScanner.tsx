@@ -44,19 +44,45 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   })
 }
 
-/** jsQR で複数解像度を試す */
-function tryDecode(img: HTMLImageElement): string | null {
-  // 小さいサイズから試す（速度重視） → 大きいサイズ（精度重視）
-  const sizes = [800, 1200, 1600]
-
-  for (const size of sizes) {
-    const { imageData } = resizeToCanvas(img, size)
-    const result = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth',
+/** 1つの解像度でデコードを試行（非同期で1フレーム挟む） */
+function decodeAtSize(
+  img: HTMLImageElement,
+  maxSize: number
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    // 1フレーム待ってからデコード → UIをブロックしない
+    requestAnimationFrame(() => {
+      const { imageData } = resizeToCanvas(img, maxSize)
+      const result = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      })
+      resolve(result?.data ?? null)
     })
-    if (result?.data) return result.data
-  }
-  return null
+  })
+}
+
+const TIMEOUT_MS = 10_000
+
+/** jsQR で複数解像度を試す（タイムアウト付き） */
+function tryDecode(img: HTMLImageElement): Promise<string | null> {
+  return new Promise((resolve) => {
+    // タイムアウト: 万が一固まっても10秒で強制終了
+    const timer = setTimeout(() => resolve(null), TIMEOUT_MS)
+
+    ;(async () => {
+      // 小さいサイズから試す（速度重視）→ 大きいサイズ（精度重視）
+      for (const size of [800, 1200, 1600]) {
+        const result = await decodeAtSize(img, size)
+        if (result) {
+          clearTimeout(timer)
+          resolve(result)
+          return
+        }
+      }
+      clearTimeout(timer)
+      resolve(null)
+    })()
+  })
 }
 
 /**
@@ -82,11 +108,7 @@ export function PhotoScanner({ onScan, className }: PhotoScannerProps) {
 
       try {
         const img = await loadImage(file)
-
-        // メインスレッドをブロックしないよう1フレーム待つ
-        await new Promise((r) => requestAnimationFrame(r))
-
-        const decoded = tryDecode(img)
+        const decoded = await tryDecode(img)
 
         if (decoded) {
           onScan(decoded)
