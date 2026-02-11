@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, ScanBarcode, Trash2, Plus, QrCode,
+  ArrowLeft, Trash2, Plus,
   AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag, ClipboardPaste,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { Product, TransactionType, TransactionCategory } from '@/types/database'
@@ -27,9 +26,6 @@ interface ItemRow {
   quantity: number
   price: number
 }
-
-// スキャン対象の区別
-type ScanTarget = 'product' | 'internal_id' | 'shipping_tracking_id' | 'order_id'
 
 const IN_CATEGORIES: TransactionCategory[] = ['入荷', '返品', '棚卸']
 const OUT_CATEGORIES: TransactionCategory[] = ['出荷', '再送', '棚卸']
@@ -51,7 +47,6 @@ export function TransactionFormPage() {
   const [partnerName, setPartnerName] = useState('')
   const [memo, setMemo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([])
-  const [scanTarget, setScanTarget] = useState<ScanTarget | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -163,7 +158,6 @@ export function TransactionFormPage() {
 
         if (error) {
           console.warn('inventory_items query failed:', error.message)
-          // テーブルが存在しない場合（マイグレーション未実行）は静かにスキップ
           setTrackingStatus(null)
           return
         }
@@ -192,38 +186,6 @@ export function TransactionFormPage() {
       }
     },
     [type, products, items, addItem]
-  )
-
-  // スキャン完了ハンドラ
-  const handleScanResult = useCallback(
-    (code: string) => {
-      if (scanTarget === 'product') {
-        setScanTarget(null)
-        const product = products.find((p) => p.internal_barcode === code)
-        if (product) {
-          addItem(product)
-          toast.success(`追加: ${product.name}`)
-        } else {
-          toast.error(`バーコード "${code}" に該当する商品が見つかりません`)
-        }
-      } else if (scanTarget === 'internal_id') {
-        setScanTarget(null)
-        setInternalId(code)
-        toast.success(`店舗管理番号読取: ${code}`)
-        if (type === 'OUT') {
-          checkInternalId(code)
-        }
-      } else if (scanTarget === 'shipping_tracking_id') {
-        setScanTarget(null)
-        setShippingTrackingId(code)
-        toast.success(`配送追跡番号読取: ${code}`)
-      } else if (scanTarget === 'order_id') {
-        setScanTarget(null)
-        setOrderId(code)
-        toast.success(`注文ID読取: ${code}`)
-      }
-    },
-    [scanTarget, products, addItem, type, checkInternalId]
   )
 
   const updateItem = (index: number, field: keyof ItemRow, value: string | number) => {
@@ -396,30 +358,12 @@ export function TransactionFormPage() {
         {/* ② 商品選択 */}
         <Card className="border-0 shadow-sm">
           <CardContent className="space-y-3 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
-                  <span className={`text-xs font-bold text-${accentColor}-600`}>2</span>
-                </div>
-                <p className="text-sm font-semibold">商品を選択</p>
+            <div className="flex items-center gap-2">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
+                <span className={`text-xs font-bold text-${accentColor}-600`}>2</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl"
-                onClick={() => setScanTarget(scanTarget === 'product' ? null : 'product')}
-              >
-                <ScanBarcode className="mr-1 h-3 w-3" />
-                スキャン
-              </Button>
+              <p className="text-sm font-semibold">商品を選択</p>
             </div>
-
-            {scanTarget === 'product' && (
-              <BarcodeScanner
-                onScan={handleScanResult}
-                onClose={() => setScanTarget(null)}
-              />
-            )}
 
             <Select
               onValueChange={(productId) => {
@@ -488,7 +432,7 @@ export function TransactionFormPage() {
               <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-muted-foreground/20 p-5 text-center">
                 <Plus className="h-6 w-6 text-muted-foreground/30" />
                 <p className="text-xs text-muted-foreground">
-                  バーコードスキャンまたは選択で商品を追加
+                  上のセレクトから商品を追加
                 </p>
               </div>
             )}
@@ -503,6 +447,7 @@ export function TransactionFormPage() {
                 <span className={`text-xs font-bold text-${accentColor}-600`}>3</span>
               </div>
               <p className="text-sm font-semibold">管理番号</p>
+              <span className="text-[10px] text-muted-foreground ml-auto">QR読取値を📋で貼り付け</span>
             </div>
 
             {/* 店舗管理番号 */}
@@ -535,22 +480,7 @@ export function TransactionFormPage() {
                 >
                   <ClipboardPaste className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl"
-                  onClick={() => setScanTarget(scanTarget === 'internal_id' ? null : 'internal_id')}
-                  title="カメラスキャン"
-                >
-                  <QrCode className="h-4 w-4 text-violet-500" />
-                </Button>
               </div>
-              {scanTarget === 'internal_id' && (
-                <BarcodeScanner
-                  onScan={handleScanResult}
-                  onClose={() => setScanTarget(null)}
-                />
-              )}
             </div>
 
             {/* 出荷時の管理番号チェック結果 */}
@@ -601,22 +531,7 @@ export function TransactionFormPage() {
                 >
                   <ClipboardPaste className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl"
-                  onClick={() => setScanTarget(scanTarget === 'shipping_tracking_id' ? null : 'shipping_tracking_id')}
-                  title="カメラスキャン"
-                >
-                  <QrCode className="h-4 w-4 text-sky-500" />
-                </Button>
               </div>
-              {scanTarget === 'shipping_tracking_id' && (
-                <BarcodeScanner
-                  onScan={handleScanResult}
-                  onClose={() => setScanTarget(null)}
-                />
-              )}
             </div>
 
             {/* 注文ID */}
@@ -641,22 +556,7 @@ export function TransactionFormPage() {
                 >
                   <ClipboardPaste className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl"
-                  onClick={() => setScanTarget(scanTarget === 'order_id' ? null : 'order_id')}
-                  title="カメラスキャン"
-                >
-                  <QrCode className="h-4 w-4 text-pink-500" />
-                </Button>
               </div>
-              {scanTarget === 'order_id' && (
-                <BarcodeScanner
-                  onScan={handleScanResult}
-                  onClose={() => setScanTarget(null)}
-                />
-              )}
             </div>
           </CardContent>
         </Card>
