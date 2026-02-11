@@ -76,14 +76,17 @@ export function TransactionDetailPage() {
       }
 
       // 個体追跡 (inventory_items) への登録/更新
-      if (tx.tracking_number) {
+      // internal_id をキーにして追跡
+      if (tx.internal_id) {
         if (tx.type === 'IN') {
           // 入庫完了 → inventory_items に IN_STOCK として登録
-          // 明細の各商品ごとにレコードを作成
           for (const item of items) {
             await supabase.from('inventory_items').insert({
               product_id: item.product_id,
-              tracking_number: tx.tracking_number,
+              tracking_number: tx.internal_id, // 互換性のため
+              internal_id: tx.internal_id,
+              shipping_tracking_id: tx.shipping_tracking_id,
+              order_id: tx.order_id,
               status: 'IN_STOCK',
               in_transaction_id: id,
               in_date: tx.date,
@@ -91,15 +94,17 @@ export function TransactionDetailPage() {
             })
           }
         } else {
-          // 出庫完了 → 該当 tracking_number の inventory_items を SHIPPED に更新
+          // 出庫完了 → 該当 internal_id の inventory_items を SHIPPED に更新
           await supabase
             .from('inventory_items')
             .update({
               status: 'SHIPPED',
               out_transaction_id: id,
               out_date: tx.date,
+              shipping_tracking_id: tx.shipping_tracking_id,
+              order_id: tx.order_id,
             })
-            .eq('tracking_number', tx.tracking_number)
+            .eq('internal_id', tx.internal_id)
             .eq('status', 'IN_STOCK')
         }
       }
@@ -131,7 +136,9 @@ export function TransactionDetailPage() {
           status: 'SCHEDULED',
           category: tx.category,
           date: new Date().toISOString().split('T')[0],
-          tracking_number: null,
+          internal_id: null,
+          shipping_tracking_id: null,
+          order_id: null,
           partner_name: tx.partner_name,
           total_amount: tx.total_amount,
           memo: tx.memo ? `[複製] ${tx.memo}` : '[複製]',
@@ -176,6 +183,10 @@ export function TransactionDetailPage() {
       </div>
     )
   }
+
+  const isIN = tx.type === 'IN'
+  const priceLabel = isIN ? '仕入れ単価' : '販売単価'
+  const hasAnyId = tx.internal_id || tx.shipping_tracking_id || tx.order_id
 
   return (
     <div className="space-y-4">
@@ -235,12 +246,6 @@ export function TransactionDetailPage() {
               <span className="text-muted-foreground">日付: </span>
               {tx.date}
             </div>
-            {tx.tracking_number && (
-              <div>
-                <span className="text-muted-foreground">管理番号: </span>
-                <span className="font-mono">{tx.tracking_number}</span>
-              </div>
-            )}
             {tx.partner_name && (
               <div>
                 <span className="text-muted-foreground">取引先: </span>
@@ -248,6 +253,31 @@ export function TransactionDetailPage() {
               </div>
             )}
           </div>
+
+          {/* 3分割管理番号 */}
+          {hasAnyId && (
+            <div className="space-y-1 text-sm">
+              {tx.internal_id && (
+                <div>
+                  <span className="text-muted-foreground">店舗管理番号: </span>
+                  <span className="font-mono">{tx.internal_id}</span>
+                </div>
+              )}
+              {tx.shipping_tracking_id && (
+                <div>
+                  <span className="text-muted-foreground">配送追跡番号: </span>
+                  <span className="font-mono">{tx.shipping_tracking_id}</span>
+                </div>
+              )}
+              {tx.order_id && (
+                <div>
+                  <span className="text-muted-foreground">注文ID: </span>
+                  <span className="font-mono">{tx.order_id}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {tx.memo && (
             <p className="text-sm text-muted-foreground">{tx.memo}</p>
           )}
@@ -264,6 +294,7 @@ export function TransactionDetailPage() {
                 <p className="text-sm font-medium">{item.product?.name ?? '不明な商品'}</p>
                 <p className="text-xs text-muted-foreground">
                   {item.quantity} × ¥{Number(item.price).toLocaleString()}
+                  <span className="ml-1 text-muted-foreground">({priceLabel})</span>
                 </p>
               </div>
               <p className="font-medium">
@@ -277,7 +308,9 @@ export function TransactionDetailPage() {
       <Separator />
 
       <div className="flex items-center justify-between">
-        <span className="font-medium">合計金額</span>
+        <span className="font-medium">
+          {isIN ? '合計仕入れ金額' : '合計販売金額'}
+        </span>
         <span className="text-lg font-bold">
           ¥{Number(tx.total_amount).toLocaleString()}
         </span>
@@ -297,7 +330,7 @@ export function TransactionDetailPage() {
               <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
               <AlertDialogDescription>
                 在庫数が{tx.type === 'IN' ? '増加' : '減少'}します。
-                {tx.tracking_number && (
+                {tx.internal_id && (
                   tx.type === 'IN'
                     ? ' 管理番号が個体追跡に登録されます。'
                     : ' 管理番号が出荷済みに更新されます。'

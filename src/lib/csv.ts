@@ -92,14 +92,16 @@ export async function importProductsCsv(text: string) {
 // ---- Transactions CSV ----
 
 export function exportTransactionsCsv(transactions: Transaction[]) {
-  const header = 'タイプ,ステータス,カテゴリ,日付,管理番号,取引先,合計金額,メモ'
+  const header = 'タイプ,ステータス,カテゴリ,日付,店舗管理番号,配送追跡番号,注文ID,取引先,合計金額,メモ'
   const rows = transactions.map((t) =>
     [
       t.type,
       t.status,
       escapeCsvField(t.category),
       t.date,
-      escapeCsvField(t.tracking_number),
+      escapeCsvField(t.internal_id),
+      escapeCsvField(t.shipping_tracking_id),
+      escapeCsvField(t.order_id),
       escapeCsvField(t.partner_name),
       t.total_amount,
       escapeCsvField(t.memo),
@@ -120,10 +122,12 @@ export async function importTransactionsCsv(text: string) {
     status: (r[1] || 'SCHEDULED') as 'SCHEDULED' | 'COMPLETED',
     category: r[2],
     date: r[3] || new Date().toISOString().split('T')[0],
-    tracking_number: r[4] || null,
-    partner_name: r[5] || null,
-    total_amount: parseInt(r[6]) || 0,
-    memo: r[7] || null,
+    internal_id: r[4] || null,
+    shipping_tracking_id: r[5] || null,
+    order_id: r[6] || null,
+    partner_name: r[7] || null,
+    total_amount: parseInt(r[8]) || 0,
+    memo: r[9] || null,
   }))
 
   const { error } = await supabase.from('transactions').insert(inserts)

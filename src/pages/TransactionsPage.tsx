@@ -46,6 +46,15 @@ export function TransactionsPage() {
     input.click()
   }
 
+  // 管理番号の表示用ヘルパー
+  const getIdDisplay = (tx: Transaction): string | null => {
+    const parts: string[] = []
+    if (tx.internal_id) parts.push(tx.internal_id)
+    if (tx.shipping_tracking_id) parts.push(tx.shipping_tracking_id)
+    if (tx.order_id) parts.push(tx.order_id)
+    return parts.length > 0 ? parts.join(' / ') : null
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -76,30 +85,37 @@ export function TransactionsPage() {
               {tab === 'SCHEDULED' ? '予定はありません' : '履歴はありません'}
             </p>
           ) : (
-            transactions.map((tx) => (
-              <Link key={tx.id} to={`/transactions/${tx.id}`}>
-                <Card className="mb-2 transition-colors hover:bg-accent">
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={tx.type === 'IN' ? 'default' : 'secondary'}>
-                          {tx.type === 'IN' ? '入庫' : '出庫'}
-                        </Badge>
-                        <Badge variant="outline">{tx.category}</Badge>
+            transactions.map((tx) => {
+              const idDisplay = getIdDisplay(tx)
+              return (
+                <Link key={tx.id} to={`/transactions/${tx.id}`}>
+                  <Card className="mb-2 transition-colors hover:bg-accent">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={tx.type === 'IN' ? 'default' : 'secondary'}>
+                            {tx.type === 'IN' ? '入庫' : '出庫'}
+                          </Badge>
+                          <Badge variant="outline">{tx.category}</Badge>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{tx.date}</span>
+                          {tx.partner_name && <span>· {tx.partner_name}</span>}
+                        </div>
+                        {idDisplay && (
+                          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                            {idDisplay}
+                          </p>
+                        )}
                       </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{tx.date}</span>
-                        {tx.partner_name && <span>· {tx.partner_name}</span>}
-                        {tx.tracking_number && <span>· #{tx.tracking_number}</span>}
+                      <div className="text-right font-medium">
+                        ¥{Number(tx.total_amount).toLocaleString()}
                       </div>
-                    </div>
-                    <div className="text-right font-medium">
-                      ¥{Number(tx.total_amount).toLocaleString()}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })
           )}
         </TabsContent>
       </Tabs>

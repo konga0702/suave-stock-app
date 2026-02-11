@@ -21,7 +21,9 @@ export interface Transaction {
   status: TransactionStatus
   category: TransactionCategory
   date: string
-  tracking_number: string | null
+  internal_id: string | null
+  shipping_tracking_id: string | null
+  order_id: string | null
   partner_name: string | null
   total_amount: number
   memo: string | null
@@ -45,6 +47,9 @@ export interface InventoryItem {
   id: string
   product_id: string
   tracking_number: string
+  internal_id: string | null
+  shipping_tracking_id: string | null
+  order_id: string | null
   status: InventoryItemStatus
   in_transaction_id: string | null
   out_transaction_id: string | null

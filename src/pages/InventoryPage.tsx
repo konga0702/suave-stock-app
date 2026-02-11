@@ -45,7 +45,10 @@ export function InventoryPage() {
     if (!search) return true
     const q = search.toLowerCase()
     return (
-      item.tracking_number.toLowerCase().includes(q) ||
+      item.tracking_number?.toLowerCase().includes(q) ||
+      item.internal_id?.toLowerCase().includes(q) ||
+      item.shipping_tracking_id?.toLowerCase().includes(q) ||
+      item.order_id?.toLowerCase().includes(q) ||
       item.product?.name?.toLowerCase().includes(q) ||
       item.partner_name?.toLowerCase().includes(q)
     )
@@ -106,9 +109,21 @@ export function InventoryPage() {
                       <p className="text-sm font-medium truncate">
                         {item.product?.name ?? '不明な商品'}
                       </p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">
-                        管理番号: {item.tracking_number}
-                      </p>
+                      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        {item.internal_id && (
+                          <p className="font-mono">店舗管理: {item.internal_id}</p>
+                        )}
+                        {item.shipping_tracking_id && (
+                          <p className="font-mono">配送追跡: {item.shipping_tracking_id}</p>
+                        )}
+                        {item.order_id && (
+                          <p className="font-mono">注文ID: {item.order_id}</p>
+                        )}
+                        {/* 旧データ互換: tracking_number のみの場合 */}
+                        {!item.internal_id && item.tracking_number && (
+                          <p className="font-mono">管理番号: {item.tracking_number}</p>
+                        )}
+                      </div>
                       <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
                         <span>入荷: {item.in_date}</span>
                         {item.out_date && <span>· 出荷: {item.out_date}</span>}

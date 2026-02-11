@@ -29,7 +29,7 @@ interface ItemRow {
 }
 
 // スキャン対象の区別
-type ScanTarget = 'product' | 'tracking'
+type ScanTarget = 'product' | 'internal_id' | 'shipping_tracking_id' | 'order_id'
 
 const IN_CATEGORIES: TransactionCategory[] = ['入荷', '返品', '棚卸']
 const OUT_CATEGORIES: TransactionCategory[] = ['出荷', '再送', '棚卸']
@@ -45,7 +45,9 @@ export function TransactionFormPage() {
   )
   const [category, setCategory] = useState<TransactionCategory>('入荷')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [trackingNumber, setTrackingNumber] = useState('')
+  const [internalId, setInternalId] = useState('')
+  const [shippingTrackingId, setShippingTrackingId] = useState('')
+  const [orderId, setOrderId] = useState('')
   const [partnerName, setPartnerName] = useState('')
   const [memo, setMemo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([])
@@ -81,7 +83,9 @@ export function TransactionFormPage() {
       setType(tx.type as TransactionType)
       setCategory(tx.category as TransactionCategory)
       setDate(tx.date)
-      setTrackingNumber(tx.tracking_number ?? '')
+      setInternalId(tx.internal_id ?? '')
+      setShippingTrackingId(tx.shipping_tracking_id ?? '')
+      setOrderId(tx.order_id ?? '')
       setPartnerName(tx.partner_name ?? '')
       setMemo(tx.memo ?? '')
 
@@ -142,10 +146,10 @@ export function TransactionFormPage() {
     [items]
   )
 
-  // 管理番号チェック（出荷時）
-  const checkTrackingNumber = useCallback(
-    async (tn: string) => {
-      if (!tn.trim() || type !== 'OUT') {
+  // 管理番号チェック（出荷時 - internal_idベース）
+  const checkInternalId = useCallback(
+    async (value: string) => {
+      if (!value.trim() || type !== 'OUT') {
         setTrackingStatus(null)
         return
       }
@@ -153,7 +157,7 @@ export function TransactionFormPage() {
       const { data } = await supabase
         .from('inventory_items')
         .select('*')
-        .eq('tracking_number', tn.trim())
+        .eq('internal_id', value.trim())
         .limit(1)
 
       if (!data || data.length === 0) {
@@ -179,43 +183,36 @@ export function TransactionFormPage() {
     [type, products, items, addItem]
   )
 
-  // 管理番号スキャン完了
-  const handleTrackingScan = useCallback(
-    (code: string) => {
-      setScanTarget(null)
-      setTrackingNumber(code)
-      toast.success(`管理番号読取: ${code}`)
-      if (type === 'OUT') {
-        checkTrackingNumber(code)
-      }
-    },
-    [type, checkTrackingNumber]
-  )
-
-  // 商品バーコードスキャン完了
-  const handleProductScan = useCallback(
-    (barcode: string) => {
-      setScanTarget(null)
-      const product = products.find((p) => p.internal_barcode === barcode)
-      if (product) {
-        addItem(product)
-        toast.success(`追加: ${product.name}`)
-      } else {
-        toast.error(`バーコード "${barcode}" に該当する商品が見つかりません`)
-      }
-    },
-    [products, addItem]
-  )
-
+  // スキャン完了ハンドラ
   const handleScanResult = useCallback(
     (code: string) => {
-      if (scanTarget === 'tracking') {
-        handleTrackingScan(code)
-      } else {
-        handleProductScan(code)
+      if (scanTarget === 'product') {
+        setScanTarget(null)
+        const product = products.find((p) => p.internal_barcode === code)
+        if (product) {
+          addItem(product)
+          toast.success(`追加: ${product.name}`)
+        } else {
+          toast.error(`バーコード "${code}" に該当する商品が見つかりません`)
+        }
+      } else if (scanTarget === 'internal_id') {
+        setScanTarget(null)
+        setInternalId(code)
+        toast.success(`店舗管理番号読取: ${code}`)
+        if (type === 'OUT') {
+          checkInternalId(code)
+        }
+      } else if (scanTarget === 'shipping_tracking_id') {
+        setScanTarget(null)
+        setShippingTrackingId(code)
+        toast.success(`配送追跡番号読取: ${code}`)
+      } else if (scanTarget === 'order_id') {
+        setScanTarget(null)
+        setOrderId(code)
+        toast.success(`注文ID読取: ${code}`)
       }
     },
-    [scanTarget, handleTrackingScan, handleProductScan]
+    [scanTarget, products, addItem, type, checkInternalId]
   )
 
   const updateItem = (index: number, field: keyof ItemRow, value: string | number) => {
@@ -238,7 +235,9 @@ export function TransactionFormPage() {
         status: 'SCHEDULED' as const,
         category,
         date,
-        tracking_number: trackingNumber.trim() || null,
+        internal_id: internalId.trim() || null,
+        shipping_tracking_id: shippingTrackingId.trim() || null,
+        order_id: orderId.trim() || null,
         partner_name: partnerName.trim() || null,
         total_amount: totalAmount,
         memo: memo.trim() || null,
@@ -292,6 +291,9 @@ export function TransactionFormPage() {
       setSaving(false)
     }
   }
+
+  // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
+  const priceLabel = isIN ? '仕入れ単価' : '販売単価'
 
   return (
     <div className="space-y-4">
@@ -402,13 +404,18 @@ export function TransactionFormPage() {
                         className="h-8 w-16 text-center"
                       />
                       <span className="text-xs text-muted-foreground">×</span>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        value={item.price}
-                        onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
-                        className="h-8 w-24"
-                      />
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          value={item.price}
+                          onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
+                          className="h-8 w-24"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {priceLabel}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -439,40 +446,44 @@ export function TransactionFormPage() {
           </CardContent>
         </Card>
 
-        {/* ③ 管理番号 (QR) */}
+        {/* ③ 管理番号 (3分割) */}
         <Card>
           <CardContent className="space-y-3 p-4">
-            <p className="text-xs font-medium text-muted-foreground">③ 管理番号 (QR)</p>
-            <div className="flex gap-2">
-              <Input
-                value={trackingNumber}
-                onChange={(e) => {
-                  setTrackingNumber(e.target.value)
-                  setTrackingStatus(null)
-                }}
-                onBlur={() => {
-                  if (type === 'OUT' && trackingNumber.trim()) {
-                    checkTrackingNumber(trackingNumber)
-                  }
-                }}
-                placeholder="管理番号を入力 or スキャン"
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setScanTarget(scanTarget === 'tracking' ? null : 'tracking')}
-              >
-                <QrCode className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="text-xs font-medium text-muted-foreground">③ 管理番号</p>
 
-            {scanTarget === 'tracking' && (
-              <BarcodeScanner
-                onScan={handleScanResult}
-                onClose={() => setScanTarget(null)}
-              />
-            )}
+            {/* 店舗管理番号 */}
+            <div className="space-y-1">
+              <Label className="text-xs">店舗管理番号</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={internalId}
+                  onChange={(e) => {
+                    setInternalId(e.target.value)
+                    setTrackingStatus(null)
+                  }}
+                  onBlur={() => {
+                    if (type === 'OUT' && internalId.trim()) {
+                      checkInternalId(internalId)
+                    }
+                  }}
+                  placeholder="店舗管理番号"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setScanTarget(scanTarget === 'internal_id' ? null : 'internal_id')}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
+              {scanTarget === 'internal_id' && (
+                <BarcodeScanner
+                  onScan={handleScanResult}
+                  onClose={() => setScanTarget(null)}
+                />
+              )}
+            </div>
 
             {/* 出荷時の管理番号チェック結果 */}
             {type === 'OUT' && trackingStatus && (
@@ -499,6 +510,58 @@ export function TransactionFormPage() {
                 )}
               </div>
             )}
+
+            {/* 配送追跡番号 */}
+            <div className="space-y-1">
+              <Label className="text-xs">配送追跡番号</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={shippingTrackingId}
+                  onChange={(e) => setShippingTrackingId(e.target.value)}
+                  placeholder="配送追跡番号"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setScanTarget(scanTarget === 'shipping_tracking_id' ? null : 'shipping_tracking_id')}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
+              {scanTarget === 'shipping_tracking_id' && (
+                <BarcodeScanner
+                  onScan={handleScanResult}
+                  onClose={() => setScanTarget(null)}
+                />
+              )}
+            </div>
+
+            {/* 注文ID */}
+            <div className="space-y-1">
+              <Label className="text-xs">注文ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  placeholder="注文ID"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setScanTarget(scanTarget === 'order_id' ? null : 'order_id')}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
+              {scanTarget === 'order_id' && (
+                <BarcodeScanner
+                  onScan={handleScanResult}
+                  onClose={() => setScanTarget(null)}
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -534,7 +597,9 @@ export function TransactionFormPage() {
 
         {/* 合計 */}
         <div className="flex items-center justify-between rounded-lg bg-muted p-3">
-          <span className="font-medium">合計金額</span>
+          <span className="font-medium">
+            {isIN ? '合計仕入れ金額' : '合計販売金額'}
+          </span>
           <span className="text-lg font-bold">¥{totalAmount.toLocaleString()}</span>
         </div>
 
