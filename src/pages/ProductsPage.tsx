@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { PhotoScanner } from '@/components/PhotoScanner'
+import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { BarcodeDisplay } from '@/components/BarcodeDisplay'
 import { supabase } from '@/lib/supabase'
 import { exportProductsCsv, importProductsCsv } from '@/lib/csv'
@@ -94,7 +94,7 @@ export function ProductsPage() {
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60 focus:border-slate-400 transition-colors"
           />
         </div>
-        <PhotoScanner onScan={(barcode) => setSearch(barcode)} />
+        <BarcodeScanButton onScan={(barcode) => setSearch(barcode)} />
       </div>
 
       <div className="space-y-2">

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PhotoScanner } from '@/components/PhotoScanner'
+import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { supabase } from '@/lib/supabase'
 import type { InventoryItem } from '@/types/database'
 
@@ -67,7 +67,7 @@ export function InventoryPage() {
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60"
           />
         </div>
-        <PhotoScanner onScan={(barcode) => setSearch(barcode)} />
+        <BarcodeScanButton onScan={(barcode) => setSearch(barcode)} />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'IN_STOCK' | 'SHIPPED')}>

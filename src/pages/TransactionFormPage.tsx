@@ -4,7 +4,7 @@ import {
   ArrowLeft, Trash2, Plus,
   AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag, ClipboardPaste,
 } from 'lucide-react'
-import { PhotoScanner } from '@/components/PhotoScanner'
+import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -483,7 +483,7 @@ export function TransactionFormPage() {
                   placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
-                <PhotoScanner
+                <BarcodeScanButton
                   className="border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
                   onScan={(value) => {
                     setInternalId(value)
@@ -542,7 +542,7 @@ export function TransactionFormPage() {
                   placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
-                <PhotoScanner
+                <BarcodeScanButton
                   className="border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950"
                   onScan={(value) => {
                     setShippingTrackingId(value)
@@ -574,7 +574,7 @@ export function TransactionFormPage() {
                   placeholder="手入力 or スキャン"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
-                <PhotoScanner
+                <BarcodeScanButton
                   className="border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950"
                   onScan={(value) => {
                     setOrderId(value)

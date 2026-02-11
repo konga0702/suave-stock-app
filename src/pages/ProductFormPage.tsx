@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste } from 'lucide-react'
-import { PhotoScanner } from '@/components/PhotoScanner'
+import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -204,7 +204,7 @@ export function ProductFormPage() {
               >
                 <ClipboardPaste className="h-4 w-4" />
               </Button>
-              <PhotoScanner
+              <BarcodeScanButton
                 onScan={(code) => {
                   setBarcode(code)
                   toast.success(`バーコード読取: ${code}`)
