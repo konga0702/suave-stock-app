@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ScanBarcode, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText } from 'lucide-react'
+import { ArrowLeft, ScanBarcode, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -181,14 +181,36 @@ export function ProductFormPage() {
                 id="barcode"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
-                placeholder="バーコード番号"
+                placeholder="手入力 or 貼り付け"
                 className="flex-1 rounded-xl font-mono"
               />
               <Button
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 rounded-xl border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600"
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText()
+                    if (text.trim()) {
+                      setBarcode(text.trim())
+                      toast.success(`貼り付け: ${text.trim()}`)
+                    } else {
+                      toast.error('クリップボードが空です')
+                    }
+                  } catch {
+                    toast.error('クリップボードへのアクセスが許可されていません')
+                  }
+                }}
+                title="貼り付け"
+              >
+                <ClipboardPaste className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-xl border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600"
                 onClick={() => setScanning(!scanning)}
+                title="カメラスキャン"
               >
                 <ScanBarcode className="h-4 w-4" />
               </Button>

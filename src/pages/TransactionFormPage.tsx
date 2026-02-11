@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, ScanBarcode, Trash2, Plus, QrCode,
-  AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag,
+  AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag, ClipboardPaste,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -303,6 +303,31 @@ export function TransactionFormPage() {
     }
   }
 
+  // クリップボードから貼り付け
+  const pasteFromClipboard = async (target: 'internal_id' | 'shipping_tracking_id' | 'order_id') => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text.trim()) {
+        toast.error('クリップボードが空です')
+        return
+      }
+      const value = text.trim()
+      if (target === 'internal_id') {
+        setInternalId(value)
+        toast.success(`貼り付け: ${value}`)
+        if (type === 'OUT') checkInternalId(value)
+      } else if (target === 'shipping_tracking_id') {
+        setShippingTrackingId(value)
+        toast.success(`貼り付け: ${value}`)
+      } else {
+        setOrderId(value)
+        toast.success(`貼り付け: ${value}`)
+      }
+    } catch {
+      toast.error('クリップボードへのアクセスが許可されていません')
+    }
+  }
+
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
   const accentColor = isIN ? 'blue' : 'amber'
@@ -498,14 +523,24 @@ export function TransactionFormPage() {
                       checkInternalId(internalId)
                     }
                   }}
-                  placeholder="店舗管理番号"
+                  placeholder="手入力 or 貼り付け"
                   className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl border-violet-200 text-violet-500 hover:bg-violet-50"
+                  onClick={() => pasteFromClipboard('internal_id')}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'internal_id' ? null : 'internal_id')}
+                  title="カメラスキャン"
                 >
                   <QrCode className="h-4 w-4 text-violet-500" />
                 </Button>
@@ -554,14 +589,24 @@ export function TransactionFormPage() {
                 <Input
                   value={shippingTrackingId}
                   onChange={(e) => setShippingTrackingId(e.target.value)}
-                  placeholder="配送追跡番号"
+                  placeholder="手入力 or 貼り付け"
                   className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl border-sky-200 text-sky-500 hover:bg-sky-50"
+                  onClick={() => pasteFromClipboard('shipping_tracking_id')}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'shipping_tracking_id' ? null : 'shipping_tracking_id')}
+                  title="カメラスキャン"
                 >
                   <QrCode className="h-4 w-4 text-sky-500" />
                 </Button>
@@ -584,14 +629,24 @@ export function TransactionFormPage() {
                 <Input
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
-                  placeholder="注文ID"
+                  placeholder="手入力 or 貼り付け"
                   className="flex-1 rounded-xl"
                 />
                 <Button
                   variant="outline"
                   size="icon"
+                  className="shrink-0 rounded-xl border-pink-200 text-pink-500 hover:bg-pink-50"
+                  onClick={() => pasteFromClipboard('order_id')}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="shrink-0 rounded-xl"
                   onClick={() => setScanTarget(scanTarget === 'order_id' ? null : 'order_id')}
+                  title="カメラスキャン"
                 >
                   <QrCode className="h-4 w-4 text-pink-500" />
                 </Button>
