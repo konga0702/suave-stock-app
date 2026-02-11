@@ -20,13 +20,13 @@ function QRCard({ label, value, use }: QRCardProps) {
   }, [value])
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm text-center">
-      <span className="inline-block rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 mb-2">
+    <div className="rounded-2xl bg-white dark:bg-slate-800 p-5 shadow-sm shadow-slate-200/50 dark:shadow-none text-center transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <span className="inline-block rounded-lg bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-2">
         QR CODE
       </span>
       <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
-      <p className="font-mono text-sm font-bold text-indigo-600 mb-3">{value}</p>
-      <canvas ref={canvasRef} className="mx-auto" />
+      <p className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">{value}</p>
+      <canvas ref={canvasRef} className="mx-auto rounded-lg" />
       <p className="text-[10px] text-muted-foreground mt-2">{use}</p>
     </div>
   )
@@ -53,12 +53,12 @@ function BarcodeCard({ format, label, value, use, type }: BarcodeCardProps) {
   }, [value, type])
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm text-center">
-      <span className="inline-block rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 mb-2">
+    <div className="rounded-2xl bg-white dark:bg-slate-800 p-5 shadow-sm shadow-slate-200/50 dark:shadow-none text-center transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <span className="inline-block rounded-lg bg-sky-50 dark:bg-sky-950 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400 mb-2">
         {format}
       </span>
       <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
-      <p className="font-mono text-sm font-bold text-indigo-600 mb-3">{value}</p>
+      <p className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">{value}</p>
       <canvas ref={canvasRef} className="mx-auto" />
       <p className="text-[10px] text-muted-foreground mt-2">{use}</p>
     </div>
@@ -162,13 +162,13 @@ function drawEAN13(canvas: HTMLCanvasElement, digits: string) {
 
 export function TestBarcodesPage() {
   return (
-    <div className="space-y-4 pb-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-5 text-white shadow-lg">
+    <div className="page-transition space-y-4 pb-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-700 via-slate-600 to-slate-500 p-5 text-white shadow-lg shadow-slate-700/15">
         <div className="relative z-10">
-          <p className="text-lg font-bold">テスト用バーコード＆QR</p>
-          <p className="text-sm text-white/80">別画面に表示してスキャンテストに使用</p>
+          <p className="text-lg font-bold tracking-tight">テスト用バーコード＆QR</p>
+          <p className="text-[13px] text-white/60">別画面に表示してスキャンテストに使用</p>
         </div>
-        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
       </div>
 
       <p className="text-xs text-center text-muted-foreground">

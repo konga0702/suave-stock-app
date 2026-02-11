@@ -100,23 +100,23 @@ export function ProductFormPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="page-transition space-y-4">
       {/* ヘッダー */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold">
+        <h1 className="text-xl font-bold tracking-tight">
           {isEdit ? '商品編集' : '商品登録'}
         </h1>
         {isEdit && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="ml-auto rounded-xl text-destructive hover:bg-red-50">
+              <Button variant="ghost" size="icon" className="ml-auto rounded-xl text-destructive hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
+            <AlertDialogContent className="rounded-2xl">
               <AlertDialogHeader>
                 <AlertDialogTitle>商品を削除しますか？</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -124,8 +124,8 @@ export function ProductFormPage() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">削除</AlertDialogAction>
+                <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-rose-500 hover:bg-rose-600 rounded-xl">削除</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -133,27 +133,27 @@ export function ProductFormPage() {
       </div>
 
       {/* ヘッダーバナー */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 via-emerald-500 to-green-500 p-5 text-white shadow-lg">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-700 via-slate-600 to-slate-500 p-5 text-white shadow-lg shadow-slate-700/15">
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
             <Package className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-lg font-bold">{isEdit ? '商品情報を編集' : '新しい商品を登録'}</p>
-            <p className="text-sm text-white/80">商品名・バーコード・在庫数・単価</p>
+            <p className="text-lg font-bold tracking-tight">{isEdit ? '商品情報を編集' : '新しい商品を登録'}</p>
+            <p className="text-[13px] text-white/60">商品名・バーコード・在庫数・単価</p>
           </div>
         </div>
-        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -right-2 h-16 w-16 rounded-full bg-white/10" />
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
+        <div className="absolute -bottom-4 right-6 h-16 w-16 rounded-full bg-white/[0.04]" />
       </div>
 
       <div className="space-y-3">
         {/* 商品名 */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50">
-                <Package className="h-3.5 w-3.5 text-teal-500" />
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                <Package className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </div>
               <Label htmlFor="name" className="text-sm font-semibold">商品名 *</Label>
             </div>
@@ -162,17 +162,17 @@ export function ProductFormPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="商品名を入力"
-              className="rounded-xl"
+              className="rounded-xl bg-white dark:bg-white/5 border-border/60"
             />
           </CardContent>
         </Card>
 
         {/* バーコード */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50">
-                <Barcode className="h-3.5 w-3.5 text-indigo-500" />
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
+                <Barcode className="h-4 w-4 text-violet-500" />
               </div>
               <Label htmlFor="barcode" className="text-sm font-semibold">管理バーコード</Label>
             </div>
@@ -182,12 +182,12 @@ export function ProductFormPage() {
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="手入力 or 貼り付け"
-                className="flex-1 rounded-xl font-mono"
+                className="flex-1 rounded-xl font-mono bg-white dark:bg-white/5 border-border/60"
               />
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-xl border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600"
+                className="h-10 w-10 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
                 onClick={async () => {
                   try {
                     const text = await navigator.clipboard.readText()
@@ -208,7 +208,7 @@ export function ProductFormPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-xl border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600"
+                className="h-10 w-10 rounded-xl border-border/60 hover:bg-accent transition-colors"
                 onClick={() => setScanning(!scanning)}
                 title="カメラスキャン"
               >
@@ -231,11 +231,11 @@ export function ProductFormPage() {
 
         {/* 在庫数 & 単価 */}
         <div className="grid grid-cols-2 gap-3">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50">
-                  <Boxes className="h-3.5 w-3.5 text-emerald-500" />
+          <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+            <CardContent className="p-5 space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950">
+                  <Boxes className="h-4 w-4 text-emerald-500" />
                 </div>
                 <Label htmlFor="stock" className="text-sm font-semibold">現在庫数</Label>
               </div>
@@ -245,15 +245,15 @@ export function ProductFormPage() {
                 inputMode="numeric"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
-                className="rounded-xl text-center text-lg font-bold"
+                className="rounded-xl text-center text-lg font-bold num-display bg-white dark:bg-white/5 border-border/60"
               />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50">
-                  <JapaneseYen className="h-3.5 w-3.5 text-amber-500" />
+          <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+            <CardContent className="p-5 space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950">
+                  <JapaneseYen className="h-4 w-4 text-amber-500" />
                 </div>
                 <Label htmlFor="price" className="text-sm font-semibold">単価 (円)</Label>
               </div>
@@ -263,18 +263,18 @@ export function ProductFormPage() {
                 inputMode="numeric"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="rounded-xl text-center text-lg font-bold"
+                className="rounded-xl text-center text-lg font-bold num-display bg-white dark:bg-white/5 border-border/60"
               />
             </CardContent>
           </Card>
         </div>
 
         {/* メモ */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-50">
-                <FileText className="h-3.5 w-3.5 text-gray-400" />
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                <FileText className="h-4 w-4 text-slate-400" />
               </div>
               <Label htmlFor="memo" className="text-sm font-semibold">メモ</Label>
             </div>
@@ -284,14 +284,14 @@ export function ProductFormPage() {
               onChange={(e) => setMemo(e.target.value)}
               placeholder="メモ"
               rows={3}
-              className="rounded-xl"
+              className="rounded-xl bg-white dark:bg-white/5 border-border/60"
             />
           </CardContent>
         </Card>
 
         {/* 保存ボタン */}
         <Button
-          className="w-full rounded-xl shadow-lg bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
+          className="w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all duration-300"
           size="lg"
           onClick={handleSave}
           disabled={saving}

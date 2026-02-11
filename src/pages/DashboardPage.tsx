@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Package, ArrowDownToLine, ArrowUpFromLine, AlertTriangle,
-  Sparkles,
+  BarChart3,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,93 +41,101 @@ export function DashboardPage() {
     loadStats()
   }, [])
 
+  const statCards = [
+    {
+      label: '商品数',
+      value: stats.totalProducts,
+      icon: Package,
+      iconBg: 'bg-slate-100 dark:bg-slate-800',
+      iconColor: 'text-slate-600 dark:text-slate-300',
+      valueColor: '',
+    },
+    {
+      label: '在庫少',
+      value: stats.lowStockCount,
+      icon: AlertTriangle,
+      iconBg: 'bg-rose-50 dark:bg-rose-950',
+      iconColor: 'text-rose-500',
+      valueColor: stats.lowStockCount > 0 ? 'text-rose-500' : '',
+    },
+    {
+      label: '入庫予定',
+      value: stats.scheduledIn,
+      icon: ArrowDownToLine,
+      iconBg: 'bg-sky-50 dark:bg-sky-950',
+      iconColor: 'text-sky-500',
+      valueColor: 'text-sky-600 dark:text-sky-400',
+    },
+    {
+      label: '出庫予定',
+      value: stats.scheduledOut,
+      icon: ArrowUpFromLine,
+      iconBg: 'bg-amber-50 dark:bg-amber-950',
+      iconColor: 'text-amber-500',
+      valueColor: 'text-amber-600 dark:text-amber-400',
+    },
+  ]
+
   return (
-    <div className="space-y-5">
-      {/* Header with gradient */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-5 text-white shadow-lg">
+    <div className="page-transition space-y-6">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600 p-6 text-white shadow-xl shadow-slate-900/10 dark:from-slate-700 dark:via-slate-600 dark:to-slate-500">
         <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            <h1 className="text-lg font-bold">在庫管理</h1>
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">在庫管理</h1>
+              <p className="text-[13px] text-white/60">
+                今日の在庫状況をひと目で確認
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-white/80">
-            今日の在庫状況をひと目で確認
-          </p>
         </div>
-        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -right-2 h-16 w-16 rounded-full bg-white/10" />
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/[0.06]" />
+        <div className="absolute -bottom-6 right-8 h-20 w-20 rounded-full bg-white/[0.04]" />
+        <div className="absolute left-1/2 top-0 h-12 w-12 rounded-full bg-white/[0.03]" />
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="overflow-hidden border-0 shadow-sm">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
-                <Package className="h-5 w-5 text-indigo-500" />
+        {statCards.map(({ label, value, icon: Icon, iconBg, iconColor, valueColor }) => (
+          <Card key={label} className="overflow-hidden border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+            <CardContent className="p-0">
+              <div className="flex items-center gap-3 p-4">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}>
+                  <Icon className={`h-5 w-5 ${iconColor}`} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground tracking-wide">{label}</p>
+                  <p className={`text-2xl font-bold tracking-tight num-display ${valueColor}`}>{value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">商品数</p>
-                <p className="text-2xl font-bold tracking-tight">{stats.totalProducts}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-0 shadow-sm">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">在庫少</p>
-                <p className="text-2xl font-bold tracking-tight text-red-500">{stats.lowStockCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-0 shadow-sm">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50">
-                <ArrowDownToLine className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">入庫予定</p>
-                <p className="text-2xl font-bold tracking-tight text-blue-500">{stats.scheduledIn}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-0 shadow-sm">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50">
-                <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">出庫予定</p>
-                <p className="text-2xl font-bold tracking-tight text-amber-500">{stats.scheduledOut}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Action Buttons */}
-      <div className="space-y-2.5 pt-1">
-        <Button asChild className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-md shadow-blue-500/25 hover:from-blue-600 hover:to-indigo-600" size="lg">
+      <div className="space-y-3 pt-1">
+        <Button
+          asChild
+          className="group w-full h-12 bg-slate-800 text-white shadow-lg shadow-slate-800/20 hover:bg-slate-700 hover:shadow-xl hover:shadow-slate-800/25 dark:bg-slate-200 dark:text-slate-900 dark:shadow-none dark:hover:bg-slate-300 transition-all duration-300 rounded-2xl text-[13px] font-semibold"
+          size="lg"
+        >
           <Link to="/transactions/new?type=IN">
-            <ArrowDownToLine className="mr-2 h-4 w-4" />
+            <ArrowDownToLine className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
             新規入庫
           </Link>
         </Button>
-        <Button asChild className="w-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-orange-600" size="lg">
+        <Button
+          asChild
+          className="group w-full h-12 bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-600 hover:shadow-xl hover:shadow-amber-500/25 dark:bg-amber-600 dark:hover:bg-amber-500 transition-all duration-300 rounded-2xl text-[13px] font-semibold"
+          size="lg"
+        >
           <Link to="/transactions/new?type=OUT">
-            <ArrowUpFromLine className="mr-2 h-4 w-4" />
+            <ArrowUpFromLine className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
             新規出庫
           </Link>
         </Button>

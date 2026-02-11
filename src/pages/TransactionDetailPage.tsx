@@ -175,8 +175,11 @@ export function TransactionDetailPage() {
 
   if (!tx) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">読み込み中...</p>
+      <div className="flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
+          <p className="text-sm text-muted-foreground">読み込み中...</p>
+        </div>
       </div>
     )
   }
@@ -186,21 +189,21 @@ export function TransactionDetailPage() {
   const hasAnyId = tx.internal_id || tx.shipping_tracking_id || tx.order_id
 
   return (
-    <div className="space-y-4">
+    <div className="page-transition space-y-4">
       {/* ヘッダー */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate('/transactions')}>
+        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate('/transactions')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold">入出庫詳細</h1>
+        <h1 className="text-xl font-bold tracking-tight">入出庫詳細</h1>
         <div className="ml-auto flex gap-1">
-          <Button variant="ghost" size="icon" className="rounded-xl hover:bg-indigo-50 hover:text-indigo-600" onClick={handleDuplicate} title="複製">
+          <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={handleDuplicate} title="複製">
             <Copy className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-xl hover:bg-indigo-50 hover:text-indigo-600"
+            className="rounded-xl hover:bg-accent transition-colors"
             onClick={() => navigate(`/transactions/${id}/edit`)}
             title="編集"
           >
@@ -208,11 +211,11 @@ export function TransactionDetailPage() {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-red-50" title="削除">
+              <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors" title="削除">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
+            <AlertDialogContent className="rounded-2xl">
               <AlertDialogHeader>
                 <AlertDialogTitle>この入出庫データを削除しますか？</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -220,8 +223,8 @@ export function TransactionDetailPage() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">削除</AlertDialogAction>
+                <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-rose-500 hover:bg-rose-600 rounded-xl">削除</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -231,11 +234,11 @@ export function TransactionDetailPage() {
       {/* タイプ＆ステータス ヘッダーバナー */}
       <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${
         isIN
-          ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600'
-          : 'bg-gradient-to-br from-amber-500 via-orange-500 to-red-500'
+          ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-500 shadow-slate-700/20'
+          : 'bg-gradient-to-br from-amber-600 via-amber-500 to-amber-400 shadow-amber-500/20'
       }`}>
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
             {isIN ? (
               <ArrowDownToLine className="h-6 w-6" />
             ) : (
@@ -245,17 +248,18 @@ export function TransactionDetailPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold">{isIN ? '入庫' : '出庫'}</span>
-              <Badge className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs">
+              <Badge className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs rounded-md">
                 {tx.category}
               </Badge>
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-sm text-white/80">
+            <div className="mt-0.5 flex items-center gap-2 text-sm text-white/70">
               <span>{tx.date}</span>
-              {tx.partner_name && <span>· {tx.partner_name}</span>}
+              {tx.partner_name && <span className="opacity-60">·</span>}
+              {tx.partner_name && <span>{tx.partner_name}</span>}
             </div>
           </div>
           <div className="ml-auto">
-            <Badge className={`rounded-lg px-2.5 py-1 text-xs border-0 ${
+            <Badge className={`rounded-lg px-2.5 py-1 text-xs border-0 font-semibold ${
               tx.status === 'SCHEDULED'
                 ? 'bg-white/20 text-white'
                 : 'bg-white text-emerald-700'
@@ -264,18 +268,18 @@ export function TransactionDetailPage() {
             </Badge>
           </div>
         </div>
-        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -right-2 h-16 w-16 rounded-full bg-white/10" />
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
+        <div className="absolute -bottom-4 right-6 h-16 w-16 rounded-full bg-white/[0.04]" />
       </div>
 
       {/* 管理番号セクション */}
       {hasAnyId && (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="space-y-2.5 p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">管理番号</p>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3 p-5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">管理番号</p>
             {tx.internal_id && (
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
                   <Store className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
@@ -285,8 +289,8 @@ export function TransactionDetailPage() {
               </div>
             )}
             {tx.shipping_tracking_id && (
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950">
                   <Truck className="h-4 w-4 text-sky-500" />
                 </div>
                 <div>
@@ -296,8 +300,8 @@ export function TransactionDetailPage() {
               </div>
             )}
             {tx.order_id && (
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pink-50 dark:bg-pink-950">
                   <ShoppingBag className="h-4 w-4 text-pink-500" />
                 </div>
                 <div>
@@ -312,15 +316,15 @@ export function TransactionDetailPage() {
 
       {/* メモ */}
       {tx.memo && (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-50">
-                <FileText className="h-4 w-4 text-gray-400" />
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                <FileText className="h-4 w-4 text-slate-400" />
               </div>
               <div>
                 <p className="text-[10px] font-medium text-muted-foreground">メモ</p>
-                <p className="text-sm text-muted-foreground mt-0.5">{tx.memo}</p>
+                <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{tx.memo}</p>
               </div>
             </div>
           </CardContent>
@@ -329,31 +333,31 @@ export function TransactionDetailPage() {
 
       {/* 明細 */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">明細</h2>
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1">明細</h2>
         {items.map((item) => (
-          <Card key={item.id} className={`border shadow-sm overflow-hidden ${
-            isIN ? 'border-blue-100' : 'border-amber-100'
+          <Card key={item.id} className={`border shadow-sm shadow-slate-200/50 dark:shadow-none overflow-hidden transition-all ${
+            isIN ? 'border-sky-100 dark:border-sky-900' : 'border-amber-100 dark:border-amber-900'
           }`}>
-            <CardContent className="flex items-center justify-between p-3.5">
+            <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                  isIN ? 'bg-blue-50' : 'bg-amber-50'
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                  isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
                 }`}>
                   {isIN ? (
-                    <ArrowDownToLine className={`h-4 w-4 text-blue-500`} />
+                    <ArrowDownToLine className="h-4 w-4 text-sky-500" />
                   ) : (
-                    <ArrowUpFromLine className={`h-4 w-4 text-amber-500`} />
+                    <ArrowUpFromLine className="h-4 w-4 text-amber-500" />
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">{item.product?.name ?? '不明な商品'}</p>
+                  <p className="text-[13px] font-semibold">{item.product?.name ?? '不明な商品'}</p>
                   <p className="text-xs text-muted-foreground">
                     {item.quantity} × ¥{Number(item.price).toLocaleString()}
-                    <span className={`ml-1 ${isIN ? 'text-blue-400' : 'text-amber-400'}`}>({priceLabel})</span>
+                    <span className={`ml-1.5 opacity-60`}>({priceLabel})</span>
                   </p>
                 </div>
               </div>
-              <p className={`font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+              <p className={`font-bold num-display ${isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 ¥{(item.quantity * Number(item.price)).toLocaleString()}
               </p>
             </CardContent>
@@ -362,16 +366,16 @@ export function TransactionDetailPage() {
       </div>
 
       {/* 合計金額 */}
-      <div className={`rounded-2xl p-4 ${
+      <div className={`rounded-2xl p-4 border ${
         isIN
-          ? 'bg-gradient-to-r from-blue-50 to-indigo-50'
-          : 'bg-gradient-to-r from-amber-50 to-orange-50'
+          ? 'bg-sky-50/50 border-sky-100 dark:bg-sky-950/30 dark:border-sky-900'
+          : 'bg-amber-50/50 border-amber-100 dark:bg-amber-950/30 dark:border-amber-900'
       }`}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-muted-foreground">
             {isIN ? '合計仕入れ金額' : '合計販売金額'}
           </span>
-          <span className={`text-2xl font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+          <span className={`text-2xl font-bold num-display ${isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
             ¥{Number(tx.total_amount).toLocaleString()}
           </span>
         </div>
@@ -382,10 +386,10 @@ export function TransactionDetailPage() {
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
-              className={`w-full rounded-xl shadow-lg ${
+              className={`w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold transition-all duration-300 ${
                 isIN
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                  ? 'bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300'
+                  : 'bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500'
               }`}
               size="lg"
               disabled={completing}
@@ -394,7 +398,7 @@ export function TransactionDetailPage() {
               {completing ? '処理中...' : '完了にする（在庫反映）'}
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent>
+          <AlertDialogContent className="rounded-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
               <AlertDialogDescription>
@@ -407,13 +411,13 @@ export function TransactionDetailPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleComplete}
-                className={isIN
-                  ? 'bg-blue-500 hover:bg-blue-600'
+                className={`rounded-xl ${isIN
+                  ? 'bg-slate-800 hover:bg-slate-700'
                   : 'bg-amber-500 hover:bg-amber-600'
-                }
+                }`}
               >
                 完了にする
               </AlertDialogAction>

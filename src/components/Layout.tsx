@@ -3,11 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { Package, ArrowLeftRight, LayoutDashboard, ScanSearch, TrendingUp } from 'lucide-react'
 
 const navItems = [
-  { path: '/', label: 'ホーム', icon: LayoutDashboard, color: 'text-indigo-500' },
-  { path: '/products', label: '商品', icon: Package, color: 'text-teal-500' },
-  { path: '/transactions', label: '入出庫', icon: ArrowLeftRight, color: 'text-amber-500' },
-  { path: '/inventory', label: '追跡', icon: ScanSearch, color: 'text-sky-500' },
-  { path: '/profit', label: '利益', icon: TrendingUp, color: 'text-emerald-500' },
+  { path: '/', label: 'ホーム', icon: LayoutDashboard },
+  { path: '/products', label: '商品', icon: Package },
+  { path: '/transactions', label: '入出庫', icon: ArrowLeftRight },
+  { path: '/inventory', label: '追跡', icon: ScanSearch },
+  { path: '/profit', label: '利益', icon: TrendingUp },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -15,16 +15,16 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
-      <main className="flex-1 overflow-y-auto pb-20">
-        <div className="mx-auto max-w-lg px-4 py-4">
+      <main className="flex-1 overflow-y-auto pb-24">
+        <div className="mx-auto max-w-lg px-5 py-5">
           {children}
         </div>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-lg items-center justify-around">
-          {navItems.map(({ path, label, icon: Icon, color }) => {
+      {/* Bottom Navigation - frosted glass */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 glass-card border-t border-border/40">
+        <div className="mx-auto flex max-w-lg items-center justify-around px-2">
+          {navItems.map(({ path, label, icon: Icon }) => {
             const isActive = path === '/'
               ? location.pathname === '/'
               : location.pathname.startsWith(path)
@@ -32,21 +32,29 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link
                 key={path}
                 to={path}
-                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] transition-all duration-200 ${
+                className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-[10px] font-medium transition-all duration-300 ${
                   isActive
-                    ? `${color} font-semibold scale-105`
-                    : 'text-gray-400 hover:text-gray-600'
+                    ? 'text-slate-800 dark:text-white'
+                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
                 {isActive && (
-                  <span className="absolute -top-0.5 h-0.5 w-8 rounded-full bg-current" />
+                  <span className="absolute top-0 h-[2.5px] w-7 rounded-full bg-slate-800 dark:bg-white transition-all duration-300" />
                 )}
-                <Icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'drop-shadow-sm' : ''}`} />
-                <span>{label}</span>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-300 ${
+                  isActive
+                    ? 'bg-slate-100 dark:bg-slate-700 shadow-sm'
+                    : ''
+                }`}>
+                  <Icon className={`h-[18px] w-[18px] transition-all duration-200 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} />
+                </div>
+                <span className={`transition-all duration-200 ${isActive ? 'font-semibold' : ''}`}>{label}</span>
               </Link>
             )
           })}
         </div>
+        {/* Safe area padding for notched devices */}
+        <div className="h-[env(safe-area-inset-bottom)]" />
       </nav>
     </div>
   )

@@ -104,32 +104,81 @@ export function ProfitDashboardPage() {
     loadData()
   }, [loadData])
 
+  const metricCards = [
+    {
+      label: '総売上',
+      value: `¥${data.totalSales.toLocaleString()}`,
+      sub: `出庫 ${data.outCount}件`,
+      icon: TrendingUp,
+      iconBg: 'bg-emerald-50 dark:bg-emerald-950',
+      iconColor: 'text-emerald-500',
+      valueColor: 'text-emerald-600 dark:text-emerald-400',
+      accentColor: 'bg-emerald-500',
+    },
+    {
+      label: '総仕入れ',
+      value: `¥${data.totalCost.toLocaleString()}`,
+      sub: `入庫 ${data.inCount}件`,
+      icon: TrendingDown,
+      iconBg: 'bg-rose-50 dark:bg-rose-950',
+      iconColor: 'text-rose-500',
+      valueColor: 'text-rose-600 dark:text-rose-400',
+      accentColor: 'bg-rose-500',
+    },
+    {
+      label: '粗利',
+      value: `¥${data.grossProfit.toLocaleString()}`,
+      sub: '売上 - 仕入れ',
+      icon: DollarSign,
+      iconBg: 'bg-sky-50 dark:bg-sky-950',
+      iconColor: 'text-sky-500',
+      valueColor: data.grossProfit >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400',
+      accentColor: data.grossProfit >= 0 ? 'bg-sky-500' : 'bg-rose-500',
+    },
+    {
+      label: '粗利益率',
+      value: `${data.profitMargin.toFixed(1)}%`,
+      sub: '粗利 ÷ 売上',
+      icon: Percent,
+      iconBg: 'bg-violet-50 dark:bg-violet-950',
+      iconColor: 'text-violet-500',
+      valueColor: data.profitMargin >= 0 ? 'text-violet-600 dark:text-violet-400' : 'text-rose-600 dark:text-rose-400',
+      accentColor: data.profitMargin >= 0 ? 'bg-violet-500' : 'bg-rose-500',
+    },
+  ]
+
   return (
-    <div className="space-y-5">
+    <div className="page-transition space-y-5">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 p-5 text-white shadow-lg">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-500 p-5 text-white shadow-lg shadow-emerald-700/15">
         <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            <h1 className="text-lg font-bold">利益ダッシュボード</h1>
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">利益ダッシュボード</h1>
+              <p className="text-[13px] text-white/60">
+                売上・仕入れ・利益を一覧で確認
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-white/80">
-            売上・仕入れ・利益を一覧で確認
-          </p>
         </div>
-        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-4 -right-2 h-16 w-16 rounded-full bg-white/10" />
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
+        <div className="absolute -bottom-4 right-6 h-16 w-16 rounded-full bg-white/[0.04]" />
       </div>
 
       {/* 期間フィルター */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-teal-500" />
+      <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+        <CardContent className="space-y-3.5 p-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950">
+              <CalendarDays className="h-4 w-4 text-teal-500" />
+            </div>
             <Label className="text-sm font-semibold">期間</Label>
           </div>
           <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
-            <SelectTrigger className="rounded-xl">
+            <SelectTrigger className="rounded-xl bg-white dark:bg-white/5 border-border/60">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -144,28 +193,28 @@ export function ProfitDashboardPage() {
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="rounded-xl"
+              className="rounded-xl bg-white dark:bg-white/5 border-border/60"
             />
           )}
 
           {periodType === 'custom' && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">開始日</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">開始日</Label>
                 <Input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="rounded-xl"
+                  className="rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">終了日</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">終了日</Label>
                 <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="rounded-xl"
+                  className="rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
               </div>
             </div>
@@ -175,133 +224,66 @@ export function ProfitDashboardPage() {
 
       {/* 利益カード */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">計算中...</p>
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 rounded-full border-2 border-emerald-300 border-t-emerald-600 animate-spin" />
+            <p className="text-sm text-muted-foreground">計算中...</p>
+          </div>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-muted-foreground">総売上</p>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
-                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+            {metricCards.map(({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor, accentColor }) => (
+              <Card key={label} className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                <CardContent className="p-0">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-medium text-muted-foreground tracking-wide">{label}</p>
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${iconBg}`}>
+                        <Icon className={`h-4 w-4 ${iconColor}`} />
+                      </div>
                     </div>
+                    <p className={`text-xl font-bold num-display ${valueColor}`}>
+                      {value}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      {sub}
+                    </p>
                   </div>
-                  <p className="text-xl font-bold text-emerald-600">
-                    ¥{data.totalSales.toLocaleString()}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    出庫 {data.outCount}件
-                  </p>
-                </div>
-                <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-400" />
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-muted-foreground">総仕入れ</p>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50">
-                      <TrendingDown className="h-4 w-4 text-red-500" />
-                    </div>
-                  </div>
-                  <p className="text-xl font-bold text-red-600">
-                    ¥{data.totalCost.toLocaleString()}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    入庫 {data.inCount}件
-                  </p>
-                </div>
-                <div className="h-1 bg-gradient-to-r from-red-400 to-rose-400" />
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-muted-foreground">粗利</p>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
-                      <DollarSign className="h-4 w-4 text-indigo-500" />
-                    </div>
-                  </div>
-                  <p className={`text-xl font-bold ${
-                    data.grossProfit >= 0 ? 'text-indigo-600' : 'text-red-600'
-                  }`}>
-                    ¥{data.grossProfit.toLocaleString()}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    売上 - 仕入れ
-                  </p>
-                </div>
-                <div className={`h-1 ${
-                  data.grossProfit >= 0
-                    ? 'bg-gradient-to-r from-indigo-400 to-violet-400'
-                    : 'bg-gradient-to-r from-red-400 to-rose-400'
-                }`} />
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-muted-foreground">粗利益率</p>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
-                      <Percent className="h-4 w-4 text-purple-500" />
-                    </div>
-                  </div>
-                  <p className={`text-xl font-bold ${
-                    data.profitMargin >= 0 ? 'text-purple-600' : 'text-red-600'
-                  }`}>
-                    {data.profitMargin.toFixed(1)}%
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    粗利 ÷ 売上
-                  </p>
-                </div>
-                <div className={`h-1 ${
-                  data.profitMargin >= 0
-                    ? 'bg-gradient-to-r from-purple-400 to-fuchsia-400'
-                    : 'bg-gradient-to-r from-red-400 to-rose-400'
-                }`} />
-              </CardContent>
-            </Card>
+                  <div className={`h-1 ${accentColor} opacity-80`} />
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {/* サマリー */}
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="space-y-3 text-sm">
+          <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+            <CardContent className="p-5">
+              <div className="space-y-3.5 text-sm">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                     <span className="text-muted-foreground">総売上（出庫完了分）</span>
                   </div>
-                  <span className="font-semibold text-emerald-600">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 num-display">
                     +¥{data.totalSales.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                     <span className="text-muted-foreground">総仕入れ（入庫完了分）</span>
                   </div>
-                  <span className="font-semibold text-red-600">
+                  <span className="font-semibold text-rose-600 dark:text-rose-400 num-display">
                     -¥{data.totalCost.toLocaleString()}
                   </span>
                 </div>
-                <div className="border-t pt-3 flex items-center justify-between font-semibold">
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${data.grossProfit >= 0 ? 'bg-indigo-500' : 'bg-red-500'}`} />
+                <div className="border-t border-border/50 pt-3.5 flex items-center justify-between font-semibold">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`h-2.5 w-2.5 rounded-full ${data.grossProfit >= 0 ? 'bg-sky-500' : 'bg-rose-500'}`} />
                     <span>粗利益</span>
                   </div>
-                  <span className={`text-base ${data.grossProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                  <span className={`text-base num-display ${data.grossProfit >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     ¥{data.grossProfit.toLocaleString()}
                   </span>
                 </div>

@@ -292,34 +292,37 @@ export function TransactionFormPage() {
 
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
-  const accentColor = isIN ? 'blue' : 'amber'
 
   return (
-    <div className="space-y-4">
+    <div className="page-transition space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold">
+        <h1 className="text-xl font-bold tracking-tight">
           {isEdit ? '入出庫編集' : isIN ? '新規入庫' : '新規出庫'}
         </h1>
       </div>
 
       <div className="space-y-4">
         {/* ① 基本情報 */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
-                <span className={`text-xs font-bold text-${accentColor}-600`}>1</span>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3.5 p-5">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
+              }`}>
+                <span className={`text-xs font-bold ${
+                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>1</span>
               </div>
               <p className="text-sm font-semibold">基本情報</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">タイプ</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">タイプ</Label>
                 <Select value={type} onValueChange={(v) => setType(v as TransactionType)}>
-                  <SelectTrigger className="rounded-xl">
+                  <SelectTrigger className="rounded-xl bg-white dark:bg-white/5 border-border/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -328,10 +331,10 @@ export function TransactionFormPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">カテゴリ</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">カテゴリ</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as TransactionCategory)}>
-                  <SelectTrigger className="rounded-xl">
+                  <SelectTrigger className="rounded-xl bg-white dark:bg-white/5 border-border/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -342,25 +345,29 @@ export function TransactionFormPage() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs" htmlFor="date">日付</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground" htmlFor="date">日付</Label>
               <Input
                 id="date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="rounded-xl"
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* ② 商品選択 */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
-                <span className={`text-xs font-bold text-${accentColor}-600`}>2</span>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3.5 p-5">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
+              }`}>
+                <span className={`text-xs font-bold ${
+                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>2</span>
               </div>
               <p className="text-sm font-semibold">商品を選択</p>
             </div>
@@ -371,7 +378,7 @@ export function TransactionFormPage() {
                 if (product) addItem(product)
               }}
             >
-              <SelectTrigger className="rounded-xl">
+              <SelectTrigger className="rounded-xl bg-white dark:bg-white/5 border-border/60">
                 <SelectValue placeholder="商品を選択して追加..." />
               </SelectTrigger>
               <SelectContent>
@@ -384,18 +391,18 @@ export function TransactionFormPage() {
             </Select>
 
             {items.map((item, index) => (
-              <div key={index} className={`flex items-center gap-2 rounded-xl border p-3 ${
-                isIN ? 'border-blue-100 bg-blue-50/30' : 'border-amber-100 bg-amber-50/30'
+              <div key={index} className={`flex items-center gap-2 rounded-2xl border p-3.5 transition-all ${
+                isIN ? 'border-sky-100 bg-sky-50/30 dark:border-sky-900 dark:bg-sky-950/30' : 'border-amber-100 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/30'
               }`}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{item.product_name}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
+                  <p className="text-[13px] font-semibold truncate">{item.product_name}</p>
+                  <div className="mt-2 flex items-center gap-2">
                     <Input
                       type="number"
                       inputMode="numeric"
                       value={item.quantity}
                       onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                      className="h-8 w-14 rounded-lg text-center text-sm"
+                      className="h-8 w-14 rounded-lg text-center text-sm bg-white dark:bg-white/5 border-border/60"
                     />
                     <span className="text-xs text-muted-foreground">×</span>
                     <div className="flex items-center gap-1">
@@ -404,7 +411,7 @@ export function TransactionFormPage() {
                         inputMode="numeric"
                         value={item.price}
                         onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
-                        className="h-8 w-20 rounded-lg text-sm"
+                        className="h-8 w-20 rounded-lg text-sm bg-white dark:bg-white/5 border-border/60"
                       />
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                         {priceLabel}
@@ -413,13 +420,13 @@ export function TransactionFormPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+                  <p className={`text-sm font-bold num-display ${isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
                     ¥{(item.quantity * item.price).toLocaleString()}
                   </p>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-red-400 hover:text-red-600"
+                    className="h-6 w-6 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors"
                     onClick={() => removeItem(index)}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -429,7 +436,7 @@ export function TransactionFormPage() {
             ))}
 
             {items.length === 0 && (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-muted-foreground/20 p-5 text-center">
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/40 p-6 text-center">
                 <Plus className="h-6 w-6 text-muted-foreground/30" />
                 <p className="text-xs text-muted-foreground">
                   上のセレクトから商品を追加
@@ -440,21 +447,25 @@ export function TransactionFormPage() {
         </Card>
 
         {/* ③ 管理番号 (3分割) */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
-                <span className={`text-xs font-bold text-${accentColor}-600`}>3</span>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3.5 p-5">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
+              }`}>
+                <span className={`text-xs font-bold ${
+                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>3</span>
               </div>
               <p className="text-sm font-semibold">管理番号</p>
-              <span className="text-[10px] text-muted-foreground ml-auto">QR読取値を📋で貼り付け</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-auto">QR読取値を貼り付け</span>
             </div>
 
             {/* 店舗管理番号 */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <Store className="h-3 w-3 text-violet-500" />
-                <Label className="text-xs">店舗管理番号</Label>
+                <Label className="text-xs text-muted-foreground">店舗管理番号</Label>
               </div>
               <div className="flex gap-2">
                 <Input
@@ -469,12 +480,12 @@ export function TransactionFormPage() {
                     }
                   }}
                   placeholder="手入力 or 貼り付け"
-                  className="flex-1 rounded-xl"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="shrink-0 rounded-xl border-violet-200 text-violet-500 hover:bg-violet-50"
+                  className="shrink-0 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
                   onClick={() => pasteFromClipboard('internal_id')}
                   title="貼り付け"
                 >
@@ -485,10 +496,10 @@ export function TransactionFormPage() {
 
             {/* 出荷時の管理番号チェック結果 */}
             {type === 'OUT' && trackingStatus && (
-              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm ${
+              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm animate-scale-in ${
                 trackingStatus === 'valid'
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-red-50 text-red-700 border border-red-200'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800'
               }`}>
                 {trackingStatus === 'valid' ? (
                   <>
@@ -510,22 +521,22 @@ export function TransactionFormPage() {
             )}
 
             {/* 配送追跡番号 */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <Truck className="h-3 w-3 text-sky-500" />
-                <Label className="text-xs">配送追跡番号</Label>
+                <Label className="text-xs text-muted-foreground">配送追跡番号</Label>
               </div>
               <div className="flex gap-2">
                 <Input
                   value={shippingTrackingId}
                   onChange={(e) => setShippingTrackingId(e.target.value)}
                   placeholder="手入力 or 貼り付け"
-                  className="flex-1 rounded-xl"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="shrink-0 rounded-xl border-sky-200 text-sky-500 hover:bg-sky-50"
+                  className="shrink-0 rounded-xl border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 transition-colors"
                   onClick={() => pasteFromClipboard('shipping_tracking_id')}
                   title="貼り付け"
                 >
@@ -535,22 +546,22 @@ export function TransactionFormPage() {
             </div>
 
             {/* 注文ID */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <ShoppingBag className="h-3 w-3 text-pink-500" />
-                <Label className="text-xs">注文ID</Label>
+                <Label className="text-xs text-muted-foreground">注文ID</Label>
               </div>
               <div className="flex gap-2">
                 <Input
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
                   placeholder="手入力 or 貼り付け"
-                  className="flex-1 rounded-xl"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="shrink-0 rounded-xl border-pink-200 text-pink-500 hover:bg-pink-50"
+                  className="shrink-0 rounded-xl border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950 transition-colors"
                   onClick={() => pasteFromClipboard('order_id')}
                   title="貼り付け"
                 >
@@ -562,18 +573,22 @@ export function TransactionFormPage() {
         </Card>
 
         {/* ④ 取引先・メモ */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-md bg-${accentColor}-100`}>
-                <span className={`text-xs font-bold text-${accentColor}-600`}>4</span>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3.5 p-5">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
+              }`}>
+                <span className={`text-xs font-bold ${
+                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>4</span>
               </div>
               <p className="text-sm font-semibold">
                 {isIN ? '取引先・メモ' : '顧客情報・メモ'}
               </p>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs" htmlFor="partner">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground" htmlFor="partner">
                 {isIN ? '取引先 (仕入先)' : '取引先 (顧客名)'}
               </Label>
               <Input
@@ -581,50 +596,50 @@ export function TransactionFormPage() {
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
                 placeholder={isIN ? '仕入先名' : '顧客名'}
-                className="rounded-xl"
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs" htmlFor="memo">メモ</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground" htmlFor="memo">メモ</Label>
               <Textarea
                 id="memo"
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
                 rows={2}
                 placeholder={isIN ? '入荷メモ' : '出荷メモ・配送先等'}
-                className="rounded-xl"
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* 合計 */}
-        <div className={`flex items-center justify-between rounded-2xl p-4 ${
+        <div className={`flex items-center justify-between rounded-2xl p-4 border ${
           isIN
-            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100'
-            : 'bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100'
+            ? 'bg-sky-50/50 border-sky-100 dark:bg-sky-950/30 dark:border-sky-900'
+            : 'bg-amber-50/50 border-amber-100 dark:bg-amber-950/30 dark:border-amber-900'
         }`}>
-          <span className="font-semibold text-sm">
+          <span className="font-semibold text-sm text-muted-foreground">
             {isIN ? '合計仕入れ金額' : '合計販売金額'}
           </span>
-          <span className={`text-xl font-bold ${isIN ? 'text-blue-600' : 'text-amber-600'}`}>
+          <span className={`text-xl font-bold num-display ${isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
             ¥{totalAmount.toLocaleString()}
           </span>
         </div>
 
         {/* 出荷時警告 */}
         {type === 'OUT' && trackingStatus === 'already_shipped' && (
-          <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700">
+          <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300 animate-scale-in">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             管理番号が出荷済みです。続行する場合は内容を確認してください。
           </div>
         )}
 
         <Button
-          className={`w-full rounded-xl shadow-md ${
+          className={`w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold transition-all duration-300 ${
             isIN
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-blue-500/25 hover:from-blue-600 hover:to-indigo-600'
-              : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/25 hover:from-amber-600 hover:to-orange-600'
+              ? 'bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300'
+              : 'bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500'
           }`}
           size="lg"
           onClick={handleSave}
