@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Package, ArrowUpFromLine, BoxSelect } from 'lucide-react'
+import { Search, X, Package, ArrowUpFromLine, BoxSelect } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -35,12 +36,13 @@ export function InventoryPage() {
     if (!search) return true
     const q = search.toLowerCase()
     return (
-      item.tracking_number?.toLowerCase().includes(q) ||
+      item.product?.name?.toLowerCase().includes(q) ||
       item.internal_id?.toLowerCase().includes(q) ||
       item.shipping_tracking_id?.toLowerCase().includes(q) ||
       item.order_id?.toLowerCase().includes(q) ||
-      item.product?.name?.toLowerCase().includes(q) ||
-      item.partner_name?.toLowerCase().includes(q)
+      item.tracking_number?.toLowerCase().includes(q) ||
+      item.partner_name?.toLowerCase().includes(q) ||
+      item.memo?.toLowerCase().includes(q)
     )
   })
 
@@ -61,13 +63,23 @@ export function InventoryPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
           <Input
-            placeholder="管理番号 or 商品名で検索"
+            placeholder="商品名・管理番号・メモなど"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             inputMode="text"
             enterKeyHint="done"
-            className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60"
+            className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60"
           />
+          {search && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
+              onClick={() => setSearch('')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
         <BarcodeScanButton onScan={(barcode) => setSearch(barcode)} />
       </div>
