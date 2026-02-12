@@ -24,30 +24,32 @@ export function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
 
   const load = useCallback(async () => {
-    const { data } = await supabase
+    // Step 1: transactions取得
+    const { data, error: txError } = await supabase
       .from('transactions')
       .select('*')
       .eq('status', tab)
       .order('date', { ascending: false })
+
+    if (txError) console.error('[TX] transactions error:', txError)
     if (!data || data.length === 0) {
       setTransactions([])
       return
     }
 
-    // ステップ2: transaction_items を取得（product_idも含む）
+    // Step 2: transaction_items取得
     const txIds = data.map((tx) => tx.id)
     const { data: itemsData, error: itemsError } = await supabase
       .from('transaction_items')
       .select('transaction_id, product_id')
       .in('transaction_id', txIds)
 
-    if (itemsError) {
-      console.error('[TransactionsPage] items error:', itemsError)
-    }
+    if (itemsError) console.error('[TX] items error:', itemsError)
+    console.log('[TX] itemsData:', itemsData?.length, 'items for', txIds.length, 'transactions')
 
-    // ステップ3: ユニークなproduct_idで products を取得
+    // Step 3: products取得
     const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
-    let productsMap = new Map<string, { name: string; image_url: string | null }>()
+    const productsMap = new Map<string, { name: string; image_url: string | null }>()
 
     if (productIds.length > 0) {
       const { data: productsData, error: prodError } = await supabase
@@ -55,9 +57,8 @@ export function TransactionsPage() {
         .select('id, name, image_url')
         .in('id', productIds)
 
-      if (prodError) {
-        console.error('[TransactionsPage] products error:', prodError)
-      }
+      if (prodError) console.error('[TX] products error:', prodError)
+      console.log('[TX] productsData:', productsData)
 
       if (productsData) {
         for (const p of productsData) {
@@ -66,7 +67,7 @@ export function TransactionsPage() {
       }
     }
 
-    // ステップ4: トランザクションごとに最初の商品をマッピング
+    // Step 4: マッピング
     const txProductMap = new Map<string, { image_url: string | null; name: string; count: number }>()
     if (itemsData) {
       for (const item of itemsData) {
@@ -84,17 +85,17 @@ export function TransactionsPage() {
       }
     }
 
-    setTransactions(
-      data.map((tx) => {
-        const productInfo = txProductMap.get(tx.id)
-        return {
-          ...tx,
-          firstProductImage: productInfo?.image_url ?? null,
-          firstProductName: productInfo?.name ?? null,
-          itemCount: productInfo?.count ?? 0,
-        }
-      })
-    )
+    const result = data.map((tx) => {
+      const productInfo = txProductMap.get(tx.id)
+      return {
+        ...tx,
+        firstProductImage: productInfo?.image_url ?? null,
+        firstProductName: productInfo?.name ?? null,
+        itemCount: productInfo?.count ?? 0,
+      }
+    })
+    console.log('[TX] final result sample:', result[0]?.firstProductName, result[0]?.firstProductImage)
+    setTransactions(result)
   }, [tab])
 
   useEffect(() => {
