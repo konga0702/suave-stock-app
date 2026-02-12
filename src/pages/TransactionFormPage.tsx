@@ -494,6 +494,13 @@ export function TransactionFormPage() {
                   enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
+                <BarcodeScanButton
+                  className="border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950"
+                  onScan={(value) => {
+                    setOrderCode(value)
+                    toast.success(`読取: ${value}`)
+                  }}
+                />
                 <Button
                   variant="outline"
                   size="icon"
@@ -520,6 +527,13 @@ export function TransactionFormPage() {
                   inputMode="text"
                   enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <BarcodeScanButton
+                  className="border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950"
+                  onScan={(value) => {
+                    setShippingCode(value)
+                    toast.success(`読取: ${value}`)
+                  }}
                 />
                 <Button
                   variant="outline"
