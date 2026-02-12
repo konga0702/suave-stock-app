@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -361,15 +361,23 @@ export function TransactionDetailPage() {
           }`}>
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                  isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
-                }`}>
-                  {isIN ? (
-                    <ArrowDownToLine className="h-4 w-4 text-sky-500" />
-                  ) : (
-                    <ArrowUpFromLine className="h-4 w-4 text-amber-500" />
-                  )}
-                </div>
+                {item.product?.image_url ? (
+                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                    isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
+                  }`}>
+                    <img src={item.product.image_url} alt={item.product.name} className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                    isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
+                  }`}>
+                    {isIN ? (
+                      <ArrowDownToLine className="h-4 w-4 text-sky-500" />
+                    ) : (
+                      <ArrowUpFromLine className="h-4 w-4 text-amber-500" />
+                    )}
+                  </div>
+                )}
                 <div>
                   <p className="text-[13px] font-semibold">{item.product?.name ?? '不明な商品'}</p>
                   <p className="text-xs text-muted-foreground">

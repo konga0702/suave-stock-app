@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,8 +11,14 @@ import { exportTransactionsCsv, importTransactionsCsv } from '@/lib/csv'
 import { toast } from 'sonner'
 import type { Transaction } from '@/types/database'
 
+interface TxWithProducts extends Transaction {
+  firstProductImage?: string | null
+  firstProductName?: string | null
+  itemCount?: number
+}
+
 export function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<TxWithProducts[]>([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('SCHEDULED')
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
@@ -23,7 +29,44 @@ export function TransactionsPage() {
       .select('*')
       .eq('status', tab)
       .order('date', { ascending: false })
-    if (data) setTransactions(data)
+    if (!data) return
+
+    // 各トランザクションに紐づく商品情報（最初の1つ）を取得
+    const txIds = data.map((tx) => tx.id)
+    const { data: itemsData } = await supabase
+      .from('transaction_items')
+      .select('transaction_id, product:products(name, image_url)')
+      .in('transaction_id', txIds)
+
+    // トランザクションごとに最初の商品をマッピング
+    const txProductMap = new Map<string, { image_url: string | null; name: string; count: number }>()
+    if (itemsData) {
+      for (const item of itemsData) {
+        const existing = txProductMap.get(item.transaction_id)
+        const product = item.product as unknown as { name: string; image_url: string | null } | null
+        if (!existing) {
+          txProductMap.set(item.transaction_id, {
+            image_url: product?.image_url ?? null,
+            name: product?.name ?? '',
+            count: 1,
+          })
+        } else {
+          existing.count++
+        }
+      }
+    }
+
+    setTransactions(
+      data.map((tx) => {
+        const productInfo = txProductMap.get(tx.id)
+        return {
+          ...tx,
+          firstProductImage: productInfo?.image_url ?? null,
+          firstProductName: productInfo?.name ?? null,
+          itemCount: productInfo?.count ?? 0,
+        }
+      })
+    )
   }, [tab])
 
   useEffect(() => {
@@ -61,6 +104,7 @@ export function TransactionsPage() {
       tx.shipping_code?.toLowerCase().includes(q) ||
       tx.memo?.toLowerCase().includes(q) ||
       tx.category?.toLowerCase().includes(q) ||
+      tx.firstProductName?.toLowerCase().includes(q) ||
       (tx.type === 'IN' ? '入庫' : '出庫').includes(q)
     )
   })
@@ -88,7 +132,7 @@ export function TransactionsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
           <Input
-            placeholder="取引先・管理番号・メモ・区分など"
+            placeholder="取引先・管理番号・商品名など"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             inputMode="text"
@@ -163,15 +207,33 @@ export function TransactionsPage() {
                     index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
                   }`}>
                     <CardContent className="flex items-center gap-3.5 p-4">
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                        isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
-                      }`}>
-                        {isIN ? (
-                          <ArrowDownToLine className="h-5 w-5 text-sky-500" />
-                        ) : (
-                          <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
-                        )}
-                      </div>
+                      {/* 商品画像 or タイプアイコン */}
+                      {tx.firstProductImage ? (
+                        <div className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                          isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
+                        }`}>
+                          <img src={tx.firstProductImage} alt="" className="h-full w-full object-cover" />
+                          <div className={`absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full ${
+                            isIN ? 'bg-sky-500' : 'bg-amber-500'
+                          }`}>
+                            {isIN ? (
+                              <ArrowDownToLine className="h-2.5 w-2.5 text-white" />
+                            ) : (
+                              <ArrowUpFromLine className="h-2.5 w-2.5 text-white" />
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                          isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
+                        }`}>
+                          {isIN ? (
+                            <ArrowDownToLine className="h-5 w-5 text-sky-500" />
+                          ) : (
+                            <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
+                          )}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
@@ -182,6 +244,11 @@ export function TransactionsPage() {
                             {isIN ? '入庫' : '出庫'}
                           </Badge>
                           <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-md border-border/60">{tx.category}</Badge>
+                          {tx.firstProductName && (
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
+                              {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? ` 他${(tx.itemCount ?? 0) - 1}件` : ''}
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{tx.date}</span>

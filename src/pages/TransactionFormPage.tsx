@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X,
+  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package,
 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ import type { Product, TransactionType, TransactionCategory } from '@/types/data
 interface ItemRow {
   product_id: string
   product_name: string
+  product_image: string | null
   quantity: number
   price: number
 }
@@ -82,17 +83,21 @@ export function TransactionFormPage() {
 
       const { data: txItems } = await supabase
         .from('transaction_items')
-        .select('*, product:products(name)')
+        .select('*, product:products(name, image_url)')
         .eq('transaction_id', id)
 
       if (txItems) {
         setItems(
-          txItems.map((item) => ({
-            product_id: item.product_id,
-            product_name: (item.product as unknown as { name: string })?.name ?? '',
-            quantity: item.quantity,
-            price: Number(item.price),
-          }))
+          txItems.map((item) => {
+            const product = item.product as unknown as { name: string; image_url: string | null } | null
+            return {
+              product_id: item.product_id,
+              product_name: product?.name ?? '',
+              product_image: product?.image_url ?? null,
+              quantity: item.quantity,
+              price: Number(item.price),
+            }
+          })
         )
       }
     }
@@ -127,6 +132,7 @@ export function TransactionFormPage() {
           {
             product_id: product.id,
             product_name: product.name,
+            product_image: product.image_url ?? null,
             quantity: 1,
             price: Number(product.default_unit_price),
           },
@@ -356,13 +362,22 @@ export function TransactionFormPage() {
                     key={p.id}
                     type="button"
                     onClick={() => addItem(p)}
-                    className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all ${
+                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all ${
                       isIN
                         ? 'hover:bg-sky-50 active:bg-sky-100 dark:hover:bg-sky-950/50 dark:active:bg-sky-900/50'
                         : 'hover:bg-amber-50 active:bg-amber-100 dark:hover:bg-amber-950/50 dark:active:bg-amber-900/50'
                     }`}
                   >
-                    <div className="min-w-0">
+                    {p.image_url ? (
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
+                        <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                        <Package className="h-4 w-4 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold truncate">{p.name}</p>
                       <p className="text-[11px] text-muted-foreground">
                         在庫: {p.current_stock} / ¥{Number(p.default_unit_price).toLocaleString()}
@@ -376,9 +391,22 @@ export function TransactionFormPage() {
 
             {/* 追加済み明細 */}
             {items.map((item, index) => (
-              <div key={index} className={`flex items-center gap-2 rounded-2xl border p-3.5 transition-all ${
+              <div key={index} className={`flex items-center gap-2.5 rounded-2xl border p-3.5 transition-all ${
                 isIN ? 'border-sky-100 bg-sky-50/30 dark:border-sky-900 dark:bg-sky-950/30' : 'border-amber-100 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/30'
               }`}>
+                {item.product_image ? (
+                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded-xl border ${
+                    isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
+                  }`}>
+                    <img src={item.product_image} alt={item.product_name} className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    isIN ? 'bg-sky-100/50 dark:bg-sky-950/50' : 'bg-amber-100/50 dark:bg-amber-950/50'
+                  }`}>
+                    <Package className="h-4 w-4 text-muted-foreground/50" />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold truncate">{item.product_name}</p>
                   <div className="mt-2 flex items-center gap-2">
