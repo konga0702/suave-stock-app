@@ -490,7 +490,7 @@ export function TransactionFormPage() {
                   onScan={(value) => {
                     setInternalId(value)
                     toast.success(`読取: ${value}`)
-                    if (type === 'OUT') checkInternalId(value)
+                    // checkInternalId は onBlur 時のみ実行（スキャン直後のAPI呼び出しを排除）
                   }}
                 />
                 <Button
