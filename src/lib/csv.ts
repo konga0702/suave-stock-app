@@ -1,5 +1,9 @@
 import { supabase } from './supabase'
-import type { Product, Transaction } from '@/types/database'
+import type { Product, Transaction, InventoryItem } from '@/types/database'
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0].replace(/-/g, '')
+}
 
 function downloadCsv(filename: string, csvContent: string) {
   const bom = '\uFEFF'
@@ -12,7 +16,7 @@ function downloadCsv(filename: string, csvContent: string) {
   URL.revokeObjectURL(url)
 }
 
-function escapeCsvField(value: string | number | null | undefined): string {
+function esc(value: string | number | null | undefined): string {
   const str = String(value ?? '')
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`
@@ -59,22 +63,21 @@ export function exportProductsCsv(products: Product[]) {
   const header = '商品名,管理バーコード,現在庫,単価,メモ'
   const rows = products.map((p) =>
     [
-      escapeCsvField(p.name),
-      escapeCsvField(p.internal_barcode),
+      esc(p.name),
+      esc(p.internal_barcode),
       p.current_stock,
       p.default_unit_price,
-      escapeCsvField(p.memo),
+      esc(p.memo),
     ].join(',')
   )
   downloadCsv(
-    `products_${new Date().toISOString().split('T')[0]}.csv`,
+    `products_${todayStr()}.csv`,
     [header, ...rows].join('\n')
   )
 }
 
 export async function importProductsCsv(text: string) {
   const rows = parseCsvRows(text)
-  // Skip header row
   const dataRows = rows.slice(1).filter((r) => r.length >= 1 && r[0])
 
   const inserts = dataRows.map((r) => ({
@@ -89,28 +92,110 @@ export async function importProductsCsv(text: string) {
   if (error) throw error
 }
 
-// ---- Transactions CSV ----
+// ---- Transactions CSV (詳細版: 商品名・数量・単価を含む) ----
 
-export function exportTransactionsCsv(transactions: Transaction[]) {
-  const header = 'タイプ,ステータス,カテゴリ,日付,管理番号,注文コード,追跡コード,取引先,合計金額,メモ'
-  const rows = transactions.map((t) =>
-    [
-      t.type,
-      t.status,
-      escapeCsvField(t.category),
-      t.date,
-      escapeCsvField(t.tracking_number),
-      escapeCsvField(t.order_code),
-      escapeCsvField(t.shipping_code),
-      escapeCsvField(t.partner_name),
-      t.total_amount,
-      escapeCsvField(t.memo),
-    ].join(',')
-  )
+export async function exportTransactionsDetailCsv() {
+  // 全トランザクション取得
+  const { data: txs } = await supabase
+    .from('transactions')
+    .select('*')
+    .order('date', { ascending: false })
+
+  if (!txs || txs.length === 0) return
+
+  // transaction_items + product を取得
+  const txIds = txs.map((t) => t.id)
+  const { data: items } = await supabase
+    .from('transaction_items')
+    .select('transaction_id, product_id, quantity, price')
+    .in('transaction_id', txIds)
+
+  // products 取得
+  const productIds = [...new Set((items ?? []).map((i) => i.product_id))]
+  const productsMap = new Map<string, string>()
+  if (productIds.length > 0) {
+    const { data: prods } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', productIds)
+    if (prods) {
+      for (const p of prods) productsMap.set(p.id, p.name)
+    }
+  }
+
+  // トランザクションごとに明細をグループ化
+  const itemsByTx = new Map<string, Array<{ product_name: string; quantity: number; price: number }>>()
+  if (items) {
+    for (const item of items) {
+      const list = itemsByTx.get(item.transaction_id) ?? []
+      list.push({
+        product_name: productsMap.get(item.product_id) ?? '',
+        quantity: item.quantity,
+        price: Number(item.price),
+      })
+      itemsByTx.set(item.transaction_id, list)
+    }
+  }
+
+  const header = '日付,区分,カテゴリ,ステータス,商品名,数量,単価,小計,合計金額,取引先,管理番号,注文コード,追跡コード,メモ'
+
+  const rows: string[] = []
+  for (const tx of txs) {
+    const txItems = itemsByTx.get(tx.id) ?? []
+    const typeName = tx.type === 'IN' ? '入庫' : '出庫'
+    const statusName = tx.status === 'COMPLETED' ? '完了' : '予定'
+
+    if (txItems.length === 0) {
+      // 明細なしの場合は1行
+      rows.push([
+        tx.date,
+        esc(typeName),
+        esc(tx.category),
+        esc(statusName),
+        '',
+        '',
+        '',
+        '',
+        tx.total_amount,
+        esc(tx.partner_name),
+        esc(tx.tracking_number),
+        esc(tx.order_code),
+        esc(tx.shipping_code),
+        esc(tx.memo),
+      ].join(','))
+    } else {
+      // 明細ごとに1行（最初の行にトランザクション情報を含む）
+      txItems.forEach((item, idx) => {
+        const subtotal = item.quantity * item.price
+        rows.push([
+          idx === 0 ? tx.date : '',
+          idx === 0 ? esc(typeName) : '',
+          idx === 0 ? esc(tx.category) : '',
+          idx === 0 ? esc(statusName) : '',
+          esc(item.product_name),
+          item.quantity,
+          item.price,
+          subtotal,
+          idx === 0 ? tx.total_amount : '',
+          idx === 0 ? esc(tx.partner_name) : '',
+          idx === 0 ? esc(tx.tracking_number) : '',
+          idx === 0 ? esc(tx.order_code) : '',
+          idx === 0 ? esc(tx.shipping_code) : '',
+          idx === 0 ? esc(tx.memo) : '',
+        ].join(','))
+      })
+    }
+  }
+
   downloadCsv(
-    `transactions_${new Date().toISOString().split('T')[0]}.csv`,
+    `transaction_report_${todayStr()}.csv`,
     [header, ...rows].join('\n')
   )
+}
+
+// 旧互換（インポート用）
+export function exportTransactionsCsv(_transactions: Transaction[]) {
+  exportTransactionsDetailCsv()
 }
 
 export async function importTransactionsCsv(text: string) {
@@ -132,4 +217,29 @@ export async function importTransactionsCsv(text: string) {
 
   const { error } = await supabase.from('transactions').insert(inserts)
   if (error) throw error
+}
+
+// ---- Inventory CSV ----
+
+export function exportInventoryCsv(items: InventoryItem[]) {
+  const header = '商品名,管理番号,注文コード,追跡コード,ステータス,入庫日,出荷日,取引先,メモ'
+  const rows = items.map((item) => {
+    const statusName = item.status === 'IN_STOCK' ? '在庫中' : '出荷済'
+    return [
+      esc(item.product?.name),
+      esc(item.tracking_number),
+      esc(item.order_code),
+      esc(item.shipping_code),
+      esc(statusName),
+      item.in_date,
+      item.out_date ?? '',
+      esc(item.partner_name),
+      esc(item.memo),
+    ].join(',')
+  })
+
+  downloadCsv(
+    `stock_report_${todayStr()}.csv`,
+    [header, ...rows].join('\n')
+  )
 }

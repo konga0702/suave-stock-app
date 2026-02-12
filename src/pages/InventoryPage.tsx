@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, X, Package, ArrowUpFromLine, BoxSelect, Tag } from 'lucide-react'
+import { Search, X, Package, ArrowUpFromLine, BoxSelect, Tag, Download } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { supabase } from '@/lib/supabase'
+import { exportInventoryCsv } from '@/lib/csv'
 import type { InventoryItem } from '@/types/database'
 
 export function InventoryPage() {
@@ -54,15 +55,26 @@ export function InventoryPage() {
     <div className="page-transition space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">個体追跡</h1>
-        <Badge className={`rounded-xl px-3 py-1 font-semibold border-0 ${
-          tab === 'IN_STOCK'
-            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300'
-            : tab === 'SHIPPED'
-              ? 'bg-slate-100 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400'
-              : 'bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900 dark:text-violet-300'
-        }`}>
-          {filtered.length}件
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge className={`rounded-xl px-3 py-1 font-semibold border-0 ${
+            tab === 'IN_STOCK'
+              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300'
+              : tab === 'SHIPPED'
+                ? 'bg-slate-100 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400'
+                : 'bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900 dark:text-violet-300'
+          }`}>
+            {filtered.length}件
+          </Badge>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+            onClick={() => exportInventoryCsv(filtered)}
+            title="CSVエクスポート"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-2">
