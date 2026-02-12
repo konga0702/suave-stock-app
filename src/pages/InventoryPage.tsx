@@ -17,7 +17,7 @@ export function InventoryPage() {
   const load = useCallback(async () => {
     let query = supabase
       .from('inventory_items')
-      .select('*, product:products(name)')
+      .select('*, product:products(name, image_url)')
       .order('created_at', { ascending: false })
 
     if (tab !== 'ALL') {
@@ -122,18 +122,26 @@ export function InventoryPage() {
               }`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3.5">
-                    <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                      item.status === 'IN_STOCK' ? 'bg-violet-50 dark:bg-violet-950' : 'bg-slate-100 dark:bg-slate-800'
-                    }`}>
-                      {item.status === 'IN_STOCK' ? (
-                        <Tag className="h-5 w-5 text-violet-500" />
-                      ) : (
-                        <ArrowUpFromLine className="h-5 w-5 text-slate-400" />
-                      )}
-                    </div>
+                    {item.product?.image_url ? (
+                      <div className={`mt-0.5 h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                        item.status === 'IN_STOCK' ? 'border-violet-200 dark:border-violet-800' : 'border-slate-200 dark:border-slate-700'
+                      }`}>
+                        <img src={item.product.image_url} alt={item.product.name} className="h-full w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                        item.status === 'IN_STOCK' ? 'bg-violet-50 dark:bg-violet-950' : 'bg-slate-100 dark:bg-slate-800'
+                      }`}>
+                        {item.status === 'IN_STOCK' ? (
+                          <Tag className="h-5 w-5 text-violet-500" />
+                        ) : (
+                          <ArrowUpFromLine className="h-5 w-5 text-slate-400" />
+                        )}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[13px] font-semibold truncate">
+                        <p className="text-[13px] font-bold truncate">
                           {item.product?.name ?? '不明な商品'}
                         </p>
                         <Badge className={`shrink-0 text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${

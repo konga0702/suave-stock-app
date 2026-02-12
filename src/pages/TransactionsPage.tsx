@@ -235,7 +235,13 @@ export function TransactionsPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        {/* 商品名を目立つように表示 */}
+                        {tx.firstProductName && (
+                          <p className="text-[13px] font-bold truncate">
+                            {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1">
                           <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
                             isIN
                               ? 'bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900 dark:text-sky-300'
@@ -244,22 +250,17 @@ export function TransactionsPage() {
                             {isIN ? '入庫' : '出庫'}
                           </Badge>
                           <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-md border-border/60">{tx.category}</Badge>
-                          {tx.firstProductName && (
-                            <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
-                              {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? ` 他${(tx.itemCount ?? 0) - 1}件` : ''}
+                          <span className="text-[11px] text-muted-foreground">{tx.date}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          {tx.partner_name && <span className="truncate">{tx.partner_name}</span>}
+                          {tx.partner_name && tx.tracking_number && <span className="opacity-40">·</span>}
+                          {tx.tracking_number && (
+                            <span className="truncate font-mono text-[10px] text-muted-foreground/50">
+                              {tx.tracking_number}
                             </span>
                           )}
                         </div>
-                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{tx.date}</span>
-                          {tx.partner_name && <span className="opacity-60">·</span>}
-                          {tx.partner_name && <span>{tx.partner_name}</span>}
-                        </div>
-                        {tx.tracking_number && (
-                          <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/50">
-                            {tx.tracking_number}
-                          </p>
-                        )}
                       </div>
                       <div className={`text-right font-bold num-display text-[15px] ${
                         isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
