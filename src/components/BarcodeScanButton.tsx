@@ -10,8 +10,11 @@ interface BarcodeScanButtonProps {
 
 /**
  * カメラアイコンボタン → 押すとオーバーレイでリアルタイムバーコードスキャナーを表示。
- * スキャン成功 → alert → 値をStateにセット → オーバーレイを閉じる。
- * ページ遷移・API呼び出しは一切行わない。
+ *
+ * 【重要】BarcodeScanner は onScan を呼ぶ前に scanner.stop() を完了させている。
+ * この handleScan が呼ばれた時点ではカメラは既に停止済みなので、
+ * 安全にオーバーレイを閉じて (setOpen(false)) コンポーネントをアンマウントできる。
+ * 念のため 100ms の遅延を入れて React 描画サイクルとの干渉を防ぐ。
  */
 export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps) {
   const [open, setOpen] = useState(false)
@@ -23,23 +26,27 @@ export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps)
   }
 
   const handleScan = (value: string) => {
+    // 二重呼び出し防止
+    if (receivedRef.current) return
+    receivedRef.current = true
+
+    console.log('[BarcodeScanButton] received:', value)
+
+    // この時点で BarcodeScanner 内のカメラは既に stop() 完了済み。
+    // 1) まず値を親コンポーネントの State にセット
     try {
-      // 二重呼び出し防止
-      if (receivedRef.current) return
-      receivedRef.current = true
-
-      console.log('[BarcodeScanButton] received:', value)
-
-      // 1) 値を親に渡す（= input の State にセットするだけ）
       onScan(value)
-
-      // 2) オーバーレイを閉じる
-      setOpen(false)
+      console.log('[BarcodeScanButton] onScan 完了')
     } catch (e) {
-      console.error('[BarcodeScanButton] handleScan error:', e)
-      alert('BarcodeScanButton エラー: ' + String(e))
-      setOpen(false)
+      console.error('[BarcodeScanButton] onScan error:', e)
     }
+
+    // 2) 100ms 待ってからオーバーレイを閉じる (アンマウント)
+    //    → BarcodeScanner の cleanup が走っても scanner は既に停止済みなので安全
+    setTimeout(() => {
+      setOpen(false)
+      console.log('[BarcodeScanButton] overlay closed')
+    }, 100)
   }
 
   return (

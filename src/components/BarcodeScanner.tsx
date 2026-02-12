@@ -23,21 +23,41 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const scannedRef = useRef(false)
-  const mountedRef = useRef(true)
+  const stoppedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [lastValue, setLastValue] = useState<string>('')
+  const [status, setStatus] = useState<string>('カメラ起動中...')
 
   useEffect(() => {
-    mountedRef.current = true
-
+    let mounted = true
     const scannerId = 'barcode-scanner-' + Date.now()
     if (containerRef.current) {
       containerRef.current.id = scannerId
     }
 
     scannedRef.current = false
+    stoppedRef.current = false
 
     let scanner: Html5Qrcode | null = null
+
+    // ── 安全にスキャナーを停止するヘルパー ──
+    const safeStop = async (s: Html5Qrcode): Promise<void> => {
+      if (stoppedRef.current) return
+      stoppedRef.current = true
+      try {
+        console.log('[BarcodeScanner] stop 開始')
+        await s.stop()
+        console.log('[BarcodeScanner] stop 完了')
+      } catch {
+        console.log('[BarcodeScanner] stop 失敗 (既に停止済み)')
+      }
+      try {
+        s.clear()
+        console.log('[BarcodeScanner] clear 完了')
+      } catch {
+        // clear 失敗は無視
+      }
+    }
 
     try {
       scanner = new Html5Qrcode(scannerId, {
@@ -46,6 +66,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         verbose: false,
       })
       scannerRef.current = scanner
+
+      console.log('[BarcodeScanner] scanner 初期化完了')
 
       scanner
         .start(
@@ -56,78 +78,97 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             aspectRatio: 1.7778,
             disableFlip: false,
           },
-          // ── onScanSuccess ──
+          // ── onScanSuccess: 非同期で安全に処理 ──
           (decodedText: string) => {
-            try {
-              // 1) 二重発火を防止
-              if (scannedRef.current) return
-              scannedRef.current = true
+            // 二重発火を防止
+            if (scannedRef.current) return
+            scannedRef.current = true
 
-              // 2) 値を整形（URLならパス末尾だけ取る）
-              let value = decodedText.trim()
-              if (/^https?:\/\//i.test(value)) {
-                try {
-                  const u = new URL(value)
-                  const seg = u.pathname.split('/').filter(Boolean)
-                  value = seg.length > 0 ? seg[seg.length - 1] : value
-                } catch {
-                  // パース失敗ならそのまま
-                }
+            console.log('[BarcodeScanner] スキャン成功 raw:', decodedText)
+
+            // 値を整形（URLならパス末尾だけ取る）
+            let value = decodedText.trim()
+            if (/^https?:\/\//i.test(value)) {
+              try {
+                const u = new URL(value)
+                const seg = u.pathname.split('/').filter(Boolean)
+                value = seg.length > 0 ? seg[seg.length - 1] : value
+              } catch {
+                // パース失敗ならそのまま
               }
-
-              // 3) デバッグ: console.log
-              console.log('[BarcodeScanner] 読取成功:', value)
-
-              // 4) デバッグ表示を更新
-              if (mountedRef.current) {
-                setLastValue(value)
-              }
-
-              // 5) スキャナー停止
-              if (scanner) {
-                scanner.stop().catch(() => {})
-              }
-
-              // 6) alert で通知 → その後に値を親へ渡す
-              //    alert はブロッキングなのでスキャナー停止後に実行
-              setTimeout(() => {
-                try {
-                  alert('読取成功: ' + value)
-                } catch {
-                  // alert が失敗しても続行
-                }
-                try {
-                  onScan(value)
-                } catch (e) {
-                  console.error('[BarcodeScanner] onScan error:', e)
-                  alert('エラー: ' + String(e))
-                }
-              }, 200)
-            } catch (e) {
-              console.error('[BarcodeScanner] handleSuccess error:', e)
-              alert('スキャン処理エラー: ' + String(e))
             }
+
+            console.log('[BarcodeScanner] 整形後の値:', value)
+
+            // デバッグ表示を更新
+            if (mounted) {
+              setLastValue(value)
+              setStatus('読取成功! カメラ停止中...')
+            }
+
+            // ── 非同期で安全に終了 ──
+            // 1) まず scanner.stop() の Promise 完了を待つ
+            // 2) 完了後に setTimeout で一息ついてから onScan を呼ぶ
+            const finalize = async () => {
+              try {
+                console.log('[BarcodeScanner] カメラ停止開始')
+                if (scanner) {
+                  await safeStop(scanner)
+                }
+                console.log('[BarcodeScanner] カメラ停止完了 → 値セット開始')
+
+                if (mounted) {
+                  setStatus('値セット完了: ' + value)
+                }
+
+                // stop() 完了後、少し待ってから親に値を渡す
+                // (React の描画サイクルとの競合を回避)
+                setTimeout(() => {
+                  try {
+                    console.log('[BarcodeScanner] onScan 呼び出し:', value)
+                    onScan(value)
+                    console.log('[BarcodeScanner] onScan 完了')
+                  } catch (e) {
+                    console.error('[BarcodeScanner] onScan エラー:', e)
+                  }
+                }, 300)
+              } catch (e) {
+                console.error('[BarcodeScanner] finalize エラー:', e)
+                // エラーでも値だけは渡す
+                setTimeout(() => {
+                  try { onScan(value) } catch { /* 最終手段 */ }
+                }, 300)
+              }
+            }
+
+            finalize()
           },
           // ── onScanFailure (毎フレーム呼ばれるので無視) ──
           () => {}
         )
+        .then(() => {
+          console.log('[BarcodeScanner] カメラ起動成功')
+          if (mounted) setStatus('スキャン待機中...')
+        })
         .catch((err: unknown) => {
-          if (mountedRef.current) {
+          console.error('[BarcodeScanner] start error:', err)
+          if (mounted) {
             setError('カメラを起動できませんでした。カメラの許可を確認してください。')
           }
-          console.error('[BarcodeScanner] start error:', err)
         })
     } catch (e) {
       console.error('[BarcodeScanner] init error:', e)
-      if (mountedRef.current) {
+      if (mounted) {
         setError('スキャナーの初期化に失敗しました: ' + String(e))
       }
     }
 
+    // ── クリーンアップ: 確実に stop を実行 ──
     return () => {
-      mountedRef.current = false
+      mounted = false
+      console.log('[BarcodeScanner] クリーンアップ開始')
       if (scanner) {
-        scanner.stop().catch(() => {})
+        safeStop(scanner)
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -152,13 +193,16 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       ) : (
         <div ref={containerRef} className="aspect-video w-full" />
       )}
-      {/* デバッグ: 最後に読み取った値 */}
-      <div className="bg-background px-3 py-2 text-center">
+      {/* デバッグ: ステータス & 最後に読み取った値 */}
+      <div className="bg-background px-3 py-2 text-center space-y-1">
         <div className="text-[10px] text-muted-foreground">
-          EAN-13 / EAN-8 / CODE-128 / CODE-39 / UPC-A / UPC-E / QR対応
+          {status}
         </div>
-        <div className="mt-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-mono">
+        <div className="rounded-lg bg-muted px-3 py-1.5 text-xs font-mono">
           最後に読み取った値：[ {lastValue || '---'} ]
+        </div>
+        <div className="text-[9px] text-muted-foreground/50">
+          EAN-13 / EAN-8 / CODE-128 / CODE-39 / UPC-A / UPC-E / QR
         </div>
       </div>
     </div>
