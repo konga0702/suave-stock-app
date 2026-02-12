@@ -64,6 +64,8 @@ export function InventoryPage() {
             placeholder="管理番号 or 商品名で検索"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            inputMode="text"
+            enterKeyHint="done"
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60"
           />
         </div>

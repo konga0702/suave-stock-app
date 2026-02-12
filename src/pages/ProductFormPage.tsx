@@ -181,6 +181,8 @@ export function ProductFormPage() {
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="手入力 or 貼り付け"
+                inputMode="text"
+                enterKeyHint="done"
                 className="flex-1 rounded-xl font-mono bg-white dark:bg-white/5 border-border/60"
               />
               <Button

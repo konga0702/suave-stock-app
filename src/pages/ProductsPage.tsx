@@ -91,6 +91,8 @@ export function ProductsPage() {
             placeholder="商品名 or バーコード検索"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            inputMode="text"
+            enterKeyHint="done"
             className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60 focus:border-slate-400 transition-colors"
           />
         </div>

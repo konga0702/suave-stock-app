@@ -481,6 +481,8 @@ export function TransactionFormPage() {
                     }
                   }}
                   placeholder="手入力 or スキャン"
+                  inputMode="text"
+                  enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <BarcodeScanButton
@@ -540,6 +542,8 @@ export function TransactionFormPage() {
                   value={shippingTrackingId}
                   onChange={(e) => setShippingTrackingId(e.target.value)}
                   placeholder="手入力 or スキャン"
+                  inputMode="text"
+                  enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <BarcodeScanButton
@@ -572,6 +576,8 @@ export function TransactionFormPage() {
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
                   placeholder="手入力 or スキャン"
+                  inputMode="text"
+                  enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
                 />
                 <BarcodeScanButton

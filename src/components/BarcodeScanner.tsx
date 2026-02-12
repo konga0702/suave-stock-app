@@ -42,9 +42,21 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       scanner.stop().catch(() => {})
     }
 
+    // URLが読み取られた場合はパス末尾の値だけ抽出（ページ遷移防止）
+    let value = decodedText.trim()
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const url = new URL(value)
+        const segments = url.pathname.split('/').filter(Boolean)
+        value = segments.length > 0 ? segments[segments.length - 1] : value
+      } catch {
+        // パースできなければそのまま使う
+      }
+    }
+
     // 少し遅延させてstateの競合を回避
     setTimeout(() => {
-      onScanRef.current(decodedText)
+      onScanRef.current(value)
     }, 100)
   }, [])
 
