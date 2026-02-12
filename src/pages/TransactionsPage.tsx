@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,7 +25,7 @@ export function TransactionsPage() {
 
   const load = useCallback(async () => {
     // Step 1: transactions取得
-    const { data, error: txError } = await supabase
+    const { data } = await supabase
       .from('transactions')
       .select('*')
       .eq('status', tab)
