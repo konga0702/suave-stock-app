@@ -15,6 +15,7 @@ export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('SCHEDULED')
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -48,8 +49,9 @@ export function TransactionsPage() {
     input.click()
   }
 
-  // 全文あいまい検索
+  // タイプ絞り込み + 全文あいまい検索
   const filtered = transactions.filter((tx) => {
+    if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -104,6 +106,31 @@ export function TransactionsPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* タイプ絞り込み */}
+      <div className="flex gap-2">
+        {(['ALL', 'IN', 'OUT'] as const).map((t) => {
+          const active = typeFilter === t
+          const label = t === 'ALL' ? 'すべて' : t === 'IN' ? '入庫' : '出庫'
+          return (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                active
+                  ? t === 'IN'
+                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300'
+                    : t === 'OUT'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
+                      : 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
