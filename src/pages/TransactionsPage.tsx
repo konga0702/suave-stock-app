@@ -29,21 +29,49 @@ export function TransactionsPage() {
       .select('*')
       .eq('status', tab)
       .order('date', { ascending: false })
-    if (!data) return
+    if (!data || data.length === 0) {
+      setTransactions([])
+      return
+    }
 
-    // 各トランザクションに紐づく商品情報（最初の1つ）を取得
+    // ステップ2: transaction_items を取得（product_idも含む）
     const txIds = data.map((tx) => tx.id)
-    const { data: itemsData } = await supabase
+    const { data: itemsData, error: itemsError } = await supabase
       .from('transaction_items')
-      .select('transaction_id, product:products(name, image_url)')
+      .select('transaction_id, product_id')
       .in('transaction_id', txIds)
 
-    // トランザクションごとに最初の商品をマッピング
+    if (itemsError) {
+      console.error('[TransactionsPage] items error:', itemsError)
+    }
+
+    // ステップ3: ユニークなproduct_idで products を取得
+    const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
+    let productsMap = new Map<string, { name: string; image_url: string | null }>()
+
+    if (productIds.length > 0) {
+      const { data: productsData, error: prodError } = await supabase
+        .from('products')
+        .select('id, name, image_url')
+        .in('id', productIds)
+
+      if (prodError) {
+        console.error('[TransactionsPage] products error:', prodError)
+      }
+
+      if (productsData) {
+        for (const p of productsData) {
+          productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null })
+        }
+      }
+    }
+
+    // ステップ4: トランザクションごとに最初の商品をマッピング
     const txProductMap = new Map<string, { image_url: string | null; name: string; count: number }>()
     if (itemsData) {
       for (const item of itemsData) {
         const existing = txProductMap.get(item.transaction_id)
-        const product = item.product as unknown as { name: string; image_url: string | null } | null
+        const product = productsMap.get(item.product_id)
         if (!existing) {
           txProductMap.set(item.transaction_id, {
             image_url: product?.image_url ?? null,
@@ -213,7 +241,7 @@ export function TransactionsPage() {
                           isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
                         }`}>
                           <img src={tx.firstProductImage} alt="" className="h-full w-full object-cover" />
-                          <div className={`absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full ${
+                          <div className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full ${
                             isIN ? 'bg-sky-500' : 'bg-amber-500'
                           }`}>
                             {isIN ? (
@@ -235,7 +263,7 @@ export function TransactionsPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        {/* 商品名を目立つように表示 */}
+                        {/* 商品名を太字で目立つように表示 */}
                         {tx.firstProductName && (
                           <p className="text-[13px] font-bold truncate">
                             {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
@@ -262,7 +290,7 @@ export function TransactionsPage() {
                           )}
                         </div>
                       </div>
-                      <div className={`text-right font-bold num-display text-[15px] ${
+                      <div className={`shrink-0 text-right font-bold num-display text-[15px] ${
                         isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
                       }`}>
                         ¥{Number(tx.total_amount).toLocaleString()}
