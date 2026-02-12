@@ -259,8 +259,14 @@ export function TransactionFormPage() {
         toast.success('入出庫データを登録しました')
       }
       navigate('/transactions')
-    } catch {
-      toast.error('保存に失敗しました')
+    } catch (err: unknown) {
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : String(err)
+      console.error('[TransactionForm] 保存エラー:', err)
+      toast.error(`保存失敗: ${msg}`)
     } finally {
       setSaving(false)
     }
