@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Store, Truck, ShoppingBag, FileText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -75,37 +75,6 @@ export function TransactionDetailPage() {
           .eq('id', item.product_id)
       }
 
-      // 個体追跡 (inventory_items) への登録/更新
-      if (tx.internal_id) {
-        if (tx.type === 'IN') {
-          for (const item of items) {
-            await supabase.from('inventory_items').insert({
-              product_id: item.product_id,
-              tracking_number: tx.internal_id,
-              internal_id: tx.internal_id,
-              shipping_tracking_id: tx.shipping_tracking_id,
-              order_id: tx.order_id,
-              status: 'IN_STOCK',
-              in_transaction_id: id,
-              in_date: tx.date,
-              partner_name: tx.partner_name,
-            })
-          }
-        } else {
-          await supabase
-            .from('inventory_items')
-            .update({
-              status: 'SHIPPED',
-              out_transaction_id: id,
-              out_date: tx.date,
-              shipping_tracking_id: tx.shipping_tracking_id,
-              order_id: tx.order_id,
-            })
-            .eq('internal_id', tx.internal_id)
-            .eq('status', 'IN_STOCK')
-        }
-      }
-
       // ステータス更新
       const { error } = await supabase
         .from('transactions')
@@ -133,9 +102,7 @@ export function TransactionDetailPage() {
           status: 'SCHEDULED',
           category: tx.category,
           date: new Date().toISOString().split('T')[0],
-          internal_id: null,
-          shipping_tracking_id: null,
-          order_id: null,
+          tracking_number: null,
           partner_name: tx.partner_name,
           total_amount: tx.total_amount,
           memo: tx.memo ? `[複製] ${tx.memo}` : '[複製]',
@@ -186,7 +153,7 @@ export function TransactionDetailPage() {
 
   const isIN = tx.type === 'IN'
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
-  const hasAnyId = tx.internal_id || tx.shipping_tracking_id || tx.order_id
+  const hasTrackingNumber = !!tx.tracking_number
 
   return (
     <div className="page-transition space-y-4">
@@ -273,43 +240,19 @@ export function TransactionDetailPage() {
       </div>
 
       {/* 管理番号セクション */}
-      {hasAnyId && (
+      {hasTrackingNumber && (
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3 p-5">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">管理番号</p>
-            {tx.internal_id && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
-                  <Store className="h-4 w-4 text-violet-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-medium text-violet-500">店舗管理番号</p>
-                  <p className="font-mono text-sm">{tx.internal_id}</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
+                <Tag className="h-4 w-4 text-violet-500" />
               </div>
-            )}
-            {tx.shipping_tracking_id && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950">
-                  <Truck className="h-4 w-4 text-sky-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-medium text-sky-500">配送追跡番号</p>
-                  <p className="font-mono text-sm">{tx.shipping_tracking_id}</p>
-                </div>
+              <div>
+                <p className="text-[10px] font-medium text-violet-500">管理番号</p>
+                <p className="font-mono text-sm">{tx.tracking_number}</p>
               </div>
-            )}
-            {tx.order_id && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pink-50 dark:bg-pink-950">
-                  <ShoppingBag className="h-4 w-4 text-pink-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-medium text-pink-500">注文ID</p>
-                  <p className="font-mono text-sm">{tx.order_id}</p>
-                </div>
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -403,11 +346,6 @@ export function TransactionDetailPage() {
               <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
               <AlertDialogDescription>
                 在庫数が{tx.type === 'IN' ? '増加' : '減少'}します。
-                {tx.internal_id && (
-                  tx.type === 'IN'
-                    ? ' 管理番号が個体追跡に登録されます。'
-                    : ' 管理番号が出荷済みに更新されます。'
-                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

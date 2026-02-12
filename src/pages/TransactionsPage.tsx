@@ -48,24 +48,13 @@ export function TransactionsPage() {
     input.click()
   }
 
-  // 管理番号の表示用ヘルパー
-  const getIdDisplay = (tx: Transaction): string | null => {
-    const parts: string[] = []
-    if (tx.internal_id) parts.push(tx.internal_id)
-    if (tx.shipping_tracking_id) parts.push(tx.shipping_tracking_id)
-    if (tx.order_id) parts.push(tx.order_id)
-    return parts.length > 0 ? parts.join(' / ') : null
-  }
-
   // 全文あいまい検索
   const filtered = transactions.filter((tx) => {
     if (!search) return true
     const q = search.toLowerCase()
     return (
       tx.partner_name?.toLowerCase().includes(q) ||
-      tx.internal_id?.toLowerCase().includes(q) ||
-      tx.shipping_tracking_id?.toLowerCase().includes(q) ||
-      tx.order_id?.toLowerCase().includes(q) ||
+      tx.tracking_number?.toLowerCase().includes(q) ||
       tx.memo?.toLowerCase().includes(q) ||
       tx.category?.toLowerCase().includes(q) ||
       (tx.type === 'IN' ? '入庫' : '出庫').includes(q)
@@ -138,7 +127,6 @@ export function TransactionsPage() {
             </div>
           ) : (
             filtered.map((tx, index) => {
-              const idDisplay = getIdDisplay(tx)
               const isIN = tx.type === 'IN'
               return (
                 <Link key={tx.id} to={`/transactions/${tx.id}`}>
@@ -171,9 +159,9 @@ export function TransactionsPage() {
                           {tx.partner_name && <span className="opacity-60">·</span>}
                           {tx.partner_name && <span>{tx.partner_name}</span>}
                         </div>
-                        {idDisplay && (
+                        {tx.tracking_number && (
                           <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/50">
-                            {idDisplay}
+                            {tx.tracking_number}
                           </p>
                         )}
                       </div>

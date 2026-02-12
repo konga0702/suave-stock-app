@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus,
-  AlertTriangle, CheckCircle2, Store, Truck, ShoppingBag, ClipboardPaste,
+  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag,
 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
@@ -42,19 +41,12 @@ export function TransactionFormPage() {
   )
   const [category, setCategory] = useState<TransactionCategory>('入荷')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [internalId, setInternalId] = useState('')
-  const [shippingTrackingId, setShippingTrackingId] = useState('')
-  const [orderId, setOrderId] = useState('')
+  const [trackingNumber, setTrackingNumber] = useState('')
   const [partnerName, setPartnerName] = useState('')
   const [memo, setMemo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [saving, setSaving] = useState(false)
-
-  // 出荷時の管理番号チェック結果
-  const [trackingStatus, setTrackingStatus] = useState<
-    null | 'valid' | 'not_found' | 'already_shipped'
-  >(null)
 
   useEffect(() => {
     supabase
@@ -79,9 +71,7 @@ export function TransactionFormPage() {
       setType(tx.type as TransactionType)
       setCategory(tx.category as TransactionCategory)
       setDate(tx.date)
-      setInternalId(tx.internal_id ?? '')
-      setShippingTrackingId(tx.shipping_tracking_id ?? '')
-      setOrderId(tx.order_id ?? '')
+      setTrackingNumber(tx.tracking_number ?? '')
       setPartnerName(tx.partner_name ?? '')
       setMemo(tx.memo ?? '')
 
@@ -108,7 +98,6 @@ export function TransactionFormPage() {
   useEffect(() => {
     if (type === 'IN') setCategory('入荷')
     else setCategory('出荷')
-    setTrackingStatus(null)
   }, [type])
 
   const categories = type === 'IN' ? IN_CATEGORIES : OUT_CATEGORIES
@@ -142,53 +131,6 @@ export function TransactionFormPage() {
     [items]
   )
 
-  // 管理番号チェック（出荷時 - internal_idベース）
-  const checkInternalId = useCallback(
-    async (value: string) => {
-      if (!value.trim() || type !== 'OUT') {
-        setTrackingStatus(null)
-        return
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('inventory_items')
-          .select('*')
-          .eq('internal_id', value.trim())
-          .limit(1)
-
-        if (error) {
-          console.warn('inventory_items query failed:', error.message)
-          setTrackingStatus(null)
-          return
-        }
-
-        if (!data || data.length === 0) {
-          setTrackingStatus('not_found')
-          return
-        }
-
-        const item = data[0]
-        if (item.status === 'SHIPPED') {
-          setTrackingStatus('already_shipped')
-        } else {
-          setTrackingStatus('valid')
-          const product = products.find((p) => p.id === item.product_id)
-          if (product) {
-            const alreadyAdded = items.find((i) => i.product_id === product.id)
-            if (!alreadyAdded) {
-              addItem(product)
-            }
-          }
-        }
-      } catch {
-        console.warn('checkInternalId error')
-        setTrackingStatus(null)
-      }
-    },
-    [type, products, items, addItem]
-  )
-
   const updateItem = (index: number, field: keyof ItemRow, value: string | number) => {
     setItems(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
   }
@@ -209,9 +151,7 @@ export function TransactionFormPage() {
         status: 'SCHEDULED' as const,
         category,
         date,
-        internal_id: internalId.trim() || null,
-        shipping_tracking_id: shippingTrackingId.trim() || null,
-        order_id: orderId.trim() || null,
+        tracking_number: trackingNumber.trim() || null,
         partner_name: partnerName.trim() || null,
         total_amount: totalAmount,
         memo: memo.trim() || null,
@@ -273,25 +213,15 @@ export function TransactionFormPage() {
   }
 
   // クリップボードから貼り付け
-  const pasteFromClipboard = async (target: 'internal_id' | 'shipping_tracking_id' | 'order_id') => {
+  const pasteFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText()
       if (!text.trim()) {
         toast.error('クリップボードが空です')
         return
       }
-      const value = text.trim()
-      if (target === 'internal_id') {
-        setInternalId(value)
-        toast.success(`貼り付け: ${value}`)
-        if (type === 'OUT') checkInternalId(value)
-      } else if (target === 'shipping_tracking_id') {
-        setShippingTrackingId(value)
-        toast.success(`貼り付け: ${value}`)
-      } else {
-        setOrderId(value)
-        toast.success(`貼り付け: ${value}`)
-      }
+      setTrackingNumber(text.trim())
+      toast.success(`貼り付け: ${text.trim()}`)
     } catch {
       toast.error('クリップボードへのアクセスが許可されていません')
     }
@@ -453,7 +383,7 @@ export function TransactionFormPage() {
           </CardContent>
         </Card>
 
-        {/* ③ 管理番号 (3分割) */}
+        {/* ③ 管理番号 */}
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3.5 p-5">
             <div className="flex items-center gap-2.5">
@@ -468,24 +398,15 @@ export function TransactionFormPage() {
               <span className="text-[10px] text-muted-foreground/60 ml-auto">📷スキャン or 📋貼り付け</span>
             </div>
 
-            {/* 店舗管理番号 */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Store className="h-3 w-3 text-violet-500" />
-                <Label className="text-xs text-muted-foreground">店舗管理番号</Label>
+                <Tag className="h-3 w-3 text-violet-500" />
+                <Label className="text-xs text-muted-foreground">管理番号 / 追跡番号</Label>
               </div>
               <div className="flex gap-2">
                 <Input
-                  value={internalId}
-                  onChange={(e) => {
-                    setInternalId(e.target.value)
-                    setTrackingStatus(null)
-                  }}
-                  onBlur={() => {
-                    if (type === 'OUT' && internalId.trim()) {
-                      checkInternalId(internalId)
-                    }
-                  }}
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
                   placeholder="手入力 or スキャン"
                   inputMode="text"
                   enterKeyHint="done"
@@ -494,110 +415,15 @@ export function TransactionFormPage() {
                 <BarcodeScanButton
                   className="border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
                   onScan={(value) => {
-                    setInternalId(value)
+                    setTrackingNumber(value)
                     toast.success(`読取: ${value}`)
-                    // checkInternalId は onBlur 時のみ実行（スキャン直後のAPI呼び出しを排除）
                   }}
                 />
                 <Button
                   variant="outline"
                   size="icon"
                   className="shrink-0 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
-                  onClick={() => pasteFromClipboard('internal_id')}
-                  title="貼り付け"
-                >
-                  <ClipboardPaste className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* 出荷時の管理番号チェック結果 */}
-            {type === 'OUT' && trackingStatus && (
-              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm animate-scale-in ${
-                trackingStatus === 'valid'
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
-                  : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800'
-              }`}>
-                {trackingStatus === 'valid' ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    入荷済み・未出荷です。出荷可能です。
-                  </>
-                ) : trackingStatus === 'already_shipped' ? (
-                  <>
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    この管理番号は既に出荷済みです。
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    この管理番号は入荷記録にありません。
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* 配送追跡番号 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Truck className="h-3 w-3 text-sky-500" />
-                <Label className="text-xs text-muted-foreground">配送追跡番号</Label>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={shippingTrackingId}
-                  onChange={(e) => setShippingTrackingId(e.target.value)}
-                  placeholder="手入力 or スキャン"
-                  inputMode="text"
-                  enterKeyHint="done"
-                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
-                />
-                <BarcodeScanButton
-                  className="border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950"
-                  onScan={(value) => {
-                    setShippingTrackingId(value)
-                    toast.success(`読取: ${value}`)
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 transition-colors"
-                  onClick={() => pasteFromClipboard('shipping_tracking_id')}
-                  title="貼り付け"
-                >
-                  <ClipboardPaste className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* 注文ID */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <ShoppingBag className="h-3 w-3 text-pink-500" />
-                <Label className="text-xs text-muted-foreground">注文ID</Label>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={orderId}
-                  onChange={(e) => setOrderId(e.target.value)}
-                  placeholder="手入力 or スキャン"
-                  inputMode="text"
-                  enterKeyHint="done"
-                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
-                />
-                <BarcodeScanButton
-                  className="border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950"
-                  onScan={(value) => {
-                    setOrderId(value)
-                    toast.success(`読取: ${value}`)
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950 transition-colors"
-                  onClick={() => pasteFromClipboard('order_id')}
+                  onClick={pasteFromClipboard}
                   title="貼り付け"
                 >
                   <ClipboardPaste className="h-4 w-4" />
@@ -661,14 +487,6 @@ export function TransactionFormPage() {
             ¥{totalAmount.toLocaleString()}
           </span>
         </div>
-
-        {/* 出荷時警告 */}
-        {type === 'OUT' && trackingStatus === 'already_shipped' && (
-          <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300 animate-scale-in">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            管理番号が出荷済みです。続行する場合は内容を確認してください。
-          </div>
-        )}
 
         <Button
           className={`w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold transition-all duration-300 ${
