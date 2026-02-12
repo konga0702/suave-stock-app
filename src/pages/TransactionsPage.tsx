@@ -31,7 +31,6 @@ export function TransactionsPage() {
       .eq('status', tab)
       .order('date', { ascending: false })
 
-    if (txError) console.error('[TX] transactions error:', txError)
     if (!data || data.length === 0) {
       setTransactions([])
       return
@@ -44,8 +43,7 @@ export function TransactionsPage() {
       .select('transaction_id, product_id')
       .in('transaction_id', txIds)
 
-    if (itemsError) console.error('[TX] items error:', itemsError)
-    console.log('[TX] itemsData:', itemsData?.length, 'items for', txIds.length, 'transactions')
+    if (itemsError) console.error('items error:', itemsError)
 
     // Step 3: products取得
     const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
@@ -57,8 +55,7 @@ export function TransactionsPage() {
         .select('id, name, image_url')
         .in('id', productIds)
 
-      if (prodError) console.error('[TX] products error:', prodError)
-      console.log('[TX] productsData:', productsData)
+      if (prodError) console.error('products error:', prodError)
 
       if (productsData) {
         for (const p of productsData) {
@@ -85,17 +82,17 @@ export function TransactionsPage() {
       }
     }
 
-    const result = data.map((tx) => {
-      const productInfo = txProductMap.get(tx.id)
-      return {
-        ...tx,
-        firstProductImage: productInfo?.image_url ?? null,
-        firstProductName: productInfo?.name ?? null,
-        itemCount: productInfo?.count ?? 0,
-      }
-    })
-    console.log('[TX] final result sample:', result[0]?.firstProductName, result[0]?.firstProductImage)
-    setTransactions(result)
+    setTransactions(
+      data.map((tx) => {
+        const productInfo = txProductMap.get(tx.id)
+        return {
+          ...tx,
+          firstProductImage: productInfo?.image_url ?? null,
+          firstProductName: productInfo?.name ?? null,
+          itemCount: productInfo?.count ?? 0,
+        }
+      })
+    )
   }, [tab])
 
   useEffect(() => {
