@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag,
+  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X,
 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
@@ -42,10 +42,13 @@ export function TransactionFormPage() {
   const [category, setCategory] = useState<TransactionCategory>('入荷')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [trackingNumber, setTrackingNumber] = useState('')
+  const [orderCode, setOrderCode] = useState('')
+  const [shippingCode, setShippingCode] = useState('')
   const [partnerName, setPartnerName] = useState('')
   const [memo, setMemo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [productSearch, setProductSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -72,6 +75,8 @@ export function TransactionFormPage() {
       setCategory(tx.category as TransactionCategory)
       setDate(tx.date)
       setTrackingNumber(tx.tracking_number ?? '')
+      setOrderCode(tx.order_code ?? '')
+      setShippingCode(tx.shipping_code ?? '')
       setPartnerName(tx.partner_name ?? '')
       setMemo(tx.memo ?? '')
 
@@ -152,6 +157,8 @@ export function TransactionFormPage() {
         category,
         date,
         tracking_number: trackingNumber.trim() || null,
+        order_code: orderCode.trim() || null,
+        shipping_code: shippingCode.trim() || null,
         partner_name: partnerName.trim() || null,
         total_amount: totalAmount,
         memo: memo.trim() || null,
@@ -213,19 +220,24 @@ export function TransactionFormPage() {
   }
 
   // クリップボードから貼り付け
-  const pasteFromClipboard = async () => {
+  const pasteToField = async (setter: (v: string) => void) => {
     try {
       const text = await navigator.clipboard.readText()
       if (!text.trim()) {
         toast.error('クリップボードが空です')
         return
       }
-      setTrackingNumber(text.trim())
+      setter(text.trim())
       toast.success(`貼り付け: ${text.trim()}`)
     } catch {
       toast.error('クリップボードへのアクセスが許可されていません')
     }
   }
+
+  // 商品フィルター
+  const filteredProducts = products.filter((p) =>
+    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
+  )
 
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
@@ -309,24 +321,60 @@ export function TransactionFormPage() {
               <p className="text-sm font-semibold">商品を選択</p>
             </div>
 
-            <Select
-              onValueChange={(productId) => {
-                const product = products.find((p) => p.id === productId)
-                if (product) addItem(product)
-              }}
-            >
-              <SelectTrigger className="rounded-xl bg-white dark:bg-white/5 border-border/60">
-                <SelectValue placeholder="商品を選択して追加..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} (在庫: {p.current_stock})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* 商品検索 */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+              <Input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="商品名で検索..."
+                inputMode="text"
+                enterKeyHint="done"
+                className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60"
+              />
+              {productSearch && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
+                  onClick={() => setProductSearch('')}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
 
+            {/* 商品リスト */}
+            <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-border/40 p-2">
+              {filteredProducts.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  該当する商品がありません
+                </p>
+              ) : (
+                filteredProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addItem(p)}
+                    className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all ${
+                      isIN
+                        ? 'hover:bg-sky-50 active:bg-sky-100 dark:hover:bg-sky-950/50 dark:active:bg-sky-900/50'
+                        : 'hover:bg-amber-50 active:bg-amber-100 dark:hover:bg-amber-950/50 dark:active:bg-amber-900/50'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold truncate">{p.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        在庫: {p.current_stock} / ¥{Number(p.default_unit_price).toLocaleString()}
+                      </p>
+                    </div>
+                    <Plus className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* 追加済み明細 */}
             {items.map((item, index) => (
               <div key={index} className={`flex items-center gap-2 rounded-2xl border p-3.5 transition-all ${
                 isIN ? 'border-sky-100 bg-sky-50/30 dark:border-sky-900 dark:bg-sky-950/30' : 'border-amber-100 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/30'
@@ -376,14 +424,14 @@ export function TransactionFormPage() {
               <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/40 p-6 text-center">
                 <Plus className="h-6 w-6 text-muted-foreground/30" />
                 <p className="text-xs text-muted-foreground">
-                  上のセレクトから商品を追加
+                  上の検索から商品を追加
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* ③ 管理番号 */}
+        {/* ③ 管理番号・コード */}
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3.5 p-5">
             <div className="flex items-center gap-2.5">
@@ -394,14 +442,14 @@ export function TransactionFormPage() {
                   isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
                 }`}>3</span>
               </div>
-              <p className="text-sm font-semibold">管理番号</p>
-              <span className="text-[10px] text-muted-foreground/60 ml-auto">📷スキャン or 📋貼り付け</span>
+              <p className="text-sm font-semibold">管理番号・コード</p>
             </div>
 
+            {/* 管理番号 */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <Tag className="h-3 w-3 text-violet-500" />
-                <Label className="text-xs text-muted-foreground">管理番号 / 追跡番号</Label>
+                <Label className="text-xs text-muted-foreground">管理番号</Label>
               </div>
               <div className="flex gap-2">
                 <Input
@@ -423,7 +471,61 @@ export function TransactionFormPage() {
                   variant="outline"
                   size="icon"
                   className="shrink-0 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
-                  onClick={pasteFromClipboard}
+                  onClick={() => pasteToField(setTrackingNumber)}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* 注文コード */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <ShoppingBag className="h-3 w-3 text-pink-500" />
+                <Label className="text-xs text-muted-foreground">注文コード</Label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={orderCode}
+                  onChange={(e) => setOrderCode(e.target.value)}
+                  placeholder="注文ID・注文番号など"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl border-pink-200 dark:border-pink-800 text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950 transition-colors"
+                  onClick={() => pasteToField(setOrderCode)}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* 追跡コード */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Truck className="h-3 w-3 text-sky-500" />
+                <Label className="text-xs text-muted-foreground">追跡コード</Label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={shippingCode}
+                  onChange={(e) => setShippingCode(e.target.value)}
+                  placeholder="配送追跡番号など"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl border-sky-200 dark:border-sky-800 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 transition-colors"
+                  onClick={() => pasteToField(setShippingCode)}
                   title="貼り付け"
                 >
                   <ClipboardPaste className="h-4 w-4" />

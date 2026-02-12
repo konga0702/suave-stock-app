@@ -22,6 +22,8 @@ export interface Transaction {
   category: TransactionCategory
   date: string
   tracking_number: string | null
+  order_code: string | null
+  shipping_code: string | null
   partner_name: string | null
   total_amount: number
   memo: string | null
@@ -39,4 +41,22 @@ export interface TransactionItem {
   product?: Product
 }
 
-// Note: inventory_items テーブルは未作成（将来実装予定）
+export type InventoryItemStatus = 'IN_STOCK' | 'SHIPPED'
+
+export interface InventoryItem {
+  id: string
+  product_id: string
+  tracking_number: string
+  order_code: string | null
+  shipping_code: string | null
+  status: InventoryItemStatus
+  in_transaction_id: string | null
+  out_transaction_id: string | null
+  in_date: string
+  out_date: string | null
+  partner_name: string | null
+  memo: string | null
+  created_at: string
+  updated_at: string
+  product?: Product
+}

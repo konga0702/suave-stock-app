@@ -55,6 +55,8 @@ export function TransactionsPage() {
     return (
       tx.partner_name?.toLowerCase().includes(q) ||
       tx.tracking_number?.toLowerCase().includes(q) ||
+      tx.order_code?.toLowerCase().includes(q) ||
+      tx.shipping_code?.toLowerCase().includes(q) ||
       tx.memo?.toLowerCase().includes(q) ||
       tx.category?.toLowerCase().includes(q) ||
       (tx.type === 'IN' ? '入庫' : '出庫').includes(q)

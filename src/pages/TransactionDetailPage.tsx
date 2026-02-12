@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, FileText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
-
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -75,6 +74,59 @@ export function TransactionDetailPage() {
           .eq('id', item.product_id)
       }
 
+      // 個体追跡データの登録/更新
+      if (tx.type === 'IN') {
+        // 入庫: inventory_items に新規登録
+        const inventoryInserts = []
+        for (const item of items) {
+          for (let i = 0; i < item.quantity; i++) {
+            inventoryInserts.push({
+              product_id: item.product_id,
+              tracking_number: tx.tracking_number || `${id.slice(0, 8)}-${i + 1}`,
+              order_code: tx.order_code || null,
+              shipping_code: tx.shipping_code || null,
+              status: 'IN_STOCK',
+              in_transaction_id: id,
+              in_date: tx.date,
+              partner_name: tx.partner_name || null,
+            })
+          }
+        }
+        if (inventoryInserts.length > 0) {
+          const { error: invError } = await supabase
+            .from('inventory_items')
+            .insert(inventoryInserts)
+          if (invError) {
+            console.error('inventory_items insert error:', invError)
+          }
+        }
+      } else {
+        // 出庫: 該当商品のIN_STOCK個体をSHIPPEDに更新 (FIFO)
+        for (const item of items) {
+          const { data: stockItems } = await supabase
+            .from('inventory_items')
+            .select('id')
+            .eq('product_id', item.product_id)
+            .eq('status', 'IN_STOCK')
+            .order('in_date', { ascending: true })
+            .limit(item.quantity)
+
+          if (stockItems && stockItems.length > 0) {
+            const ids = stockItems.map((si) => si.id)
+            await supabase
+              .from('inventory_items')
+              .update({
+                status: 'SHIPPED',
+                out_transaction_id: id,
+                out_date: tx.date,
+                shipping_code: tx.shipping_code || null,
+                order_code: tx.order_code || null,
+              })
+              .in('id', ids)
+          }
+        }
+      }
+
       // ステータス更新
       const { error } = await supabase
         .from('transactions')
@@ -82,7 +134,7 @@ export function TransactionDetailPage() {
         .eq('id', id)
       if (error) throw error
 
-      toast.success('完了しました。在庫数を反映しました。')
+      toast.success('完了しました。在庫数と個体追跡を反映しました。')
       setTx({ ...tx, status: 'COMPLETED' })
     } catch {
       toast.error('完了処理に失敗しました')
@@ -103,6 +155,8 @@ export function TransactionDetailPage() {
           category: tx.category,
           date: new Date().toISOString().split('T')[0],
           tracking_number: null,
+          order_code: null,
+          shipping_code: null,
           partner_name: tx.partner_name,
           total_amount: tx.total_amount,
           memo: tx.memo ? `[複製] ${tx.memo}` : '[複製]',
@@ -153,7 +207,7 @@ export function TransactionDetailPage() {
 
   const isIN = tx.type === 'IN'
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
-  const hasTrackingNumber = !!tx.tracking_number
+  const hasAnyCodes = !!tx.tracking_number || !!tx.order_code || !!tx.shipping_code
 
   return (
     <div className="page-transition space-y-4">
@@ -239,20 +293,44 @@ export function TransactionDetailPage() {
         <div className="absolute -bottom-4 right-6 h-16 w-16 rounded-full bg-white/[0.04]" />
       </div>
 
-      {/* 管理番号セクション */}
-      {hasTrackingNumber && (
+      {/* 管理番号・コード セクション */}
+      {hasAnyCodes && (
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3 p-5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">管理番号</p>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
-                <Tag className="h-4 w-4 text-violet-500" />
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">管理番号・コード</p>
+            {tx.tracking_number && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
+                  <Tag className="h-4 w-4 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-violet-500">管理番号</p>
+                  <p className="font-mono text-sm">{tx.tracking_number}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-medium text-violet-500">管理番号</p>
-                <p className="font-mono text-sm">{tx.tracking_number}</p>
+            )}
+            {tx.order_code && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pink-50 dark:bg-pink-950">
+                  <ShoppingBag className="h-4 w-4 text-pink-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-pink-500">注文コード</p>
+                  <p className="font-mono text-sm">{tx.order_code}</p>
+                </div>
               </div>
-            </div>
+            )}
+            {tx.shipping_code && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950">
+                  <Truck className="h-4 w-4 text-sky-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-sky-500">追跡コード</p>
+                  <p className="font-mono text-sm">{tx.shipping_code}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -345,7 +423,7 @@ export function TransactionDetailPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
               <AlertDialogDescription>
-                在庫数が{tx.type === 'IN' ? '増加' : '減少'}します。
+                在庫数が{tx.type === 'IN' ? '増加' : '減少'}し、個体追跡データが更新されます。
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
