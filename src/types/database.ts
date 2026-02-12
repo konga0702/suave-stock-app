@@ -8,6 +8,7 @@ export interface Product {
   id: string
   name: string
   internal_barcode: string | null
+  image_url: string | null
   current_stock: number
   default_unit_price: number
   memo: string | null
