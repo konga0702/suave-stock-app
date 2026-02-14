@@ -7,13 +7,18 @@ export type TransactionCategory = InCategory | OutCategory
 export interface Product {
   id: string
   name: string
+  product_code: string | null
   internal_barcode: string | null
   image_url: string | null
+  cost_price: number
+  selling_price: number
+  supplier: string | null
   current_stock: number
-  default_unit_price: number
   memo: string | null
   created_at: string
   updated_at: string
+  /** @deprecated 後方互換用。cost_price を使用してください */
+  default_unit_price?: number
 }
 
 export interface Transaction {

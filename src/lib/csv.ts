@@ -60,13 +60,16 @@ function parseCsvRows(text: string): string[][] {
 // ---- Products CSV ----
 
 export function exportProductsCsv(products: Product[]) {
-  const header = '商品名,管理バーコード,現在庫,単価,メモ'
+  const header = '商品名,商品コード,バーコード,仕入価格,販売価格,仕入れ先,数量,メモ'
   const rows = products.map((p) =>
     [
       esc(p.name),
+      esc(p.product_code),
       esc(p.internal_barcode),
+      p.cost_price ?? p.default_unit_price ?? 0,
+      p.selling_price ?? 0,
+      esc(p.supplier),
       p.current_stock,
-      p.default_unit_price,
       esc(p.memo),
     ].join(',')
   )
@@ -82,10 +85,14 @@ export async function importProductsCsv(text: string) {
 
   const inserts = dataRows.map((r) => ({
     name: r[0],
-    internal_barcode: r[1] || null,
-    current_stock: parseInt(r[2]) || 0,
+    product_code: r[1] || null,
+    internal_barcode: r[2] || null,
+    cost_price: parseInt(r[3]) || 0,
+    selling_price: parseInt(r[4]) || 0,
     default_unit_price: parseInt(r[3]) || 0,
-    memo: r[4] || null,
+    supplier: r[5] || null,
+    current_stock: parseInt(r[6]) || 0,
+    memo: r[7] || null,
   }))
 
   const { error } = await supabase.from('products').insert(inserts)

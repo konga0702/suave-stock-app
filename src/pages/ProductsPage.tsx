@@ -34,11 +34,15 @@ export function ProductsPage() {
     loadProducts()
   }, [loadProducts])
 
-  const filtered = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.internal_barcode && p.internal_barcode.includes(search))
-  )
+  const filtered = products.filter((p) => {
+    const q = search.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.internal_barcode && p.internal_barcode.toLowerCase().includes(q)) ||
+      (p.product_code && p.product_code.toLowerCase().includes(q)) ||
+      (p.supplier && p.supplier.toLowerCase().includes(q))
+    )
+  })
 
   const handleImport = async () => {
     const input = document.createElement('input')
@@ -88,7 +92,7 @@ export function ProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
           <Input
-            placeholder="商品名 or バーコード検索"
+            placeholder="商品名・コード・バーコード・仕入れ先"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             inputMode="text"
@@ -134,11 +138,17 @@ export function ProductsPage() {
                   >
                     {product.name}
                   </Link>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                    {product.product_code && (
+                      <span className="font-mono text-[11px] text-muted-foreground/70">{product.product_code}</span>
+                    )}
                     {product.internal_barcode && (
                       <span className="font-mono text-[11px] text-muted-foreground/70">{product.internal_barcode}</span>
                     )}
-                    <span className="font-semibold text-slate-600 dark:text-slate-300 num-display">¥{Number(product.default_unit_price).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                    <span className="text-rose-500 dark:text-rose-400 font-semibold num-display">仕¥{Number(product.cost_price ?? product.default_unit_price ?? 0).toLocaleString()}</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold num-display">売¥{Number(product.selling_price ?? 0).toLocaleString()}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste, Camera, ImagePlus, X } from 'lucide-react'
+import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste, Camera, ImagePlus, X, Hash, Building2 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,9 +27,12 @@ export function ProductFormPage() {
   const isEdit = !!id
 
   const [name, setName] = useState('')
+  const [productCode, setProductCode] = useState('')
   const [barcode, setBarcode] = useState('')
+  const [costPrice, setCostPrice] = useState('0')
+  const [sellingPrice, setSellingPrice] = useState('0')
+  const [supplier, setSupplier] = useState('')
   const [stock, setStock] = useState('0')
-  const [price, setPrice] = useState('0')
   const [memo, setMemo] = useState('')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -48,9 +51,12 @@ export function ProductFormPage() {
         .single()
       if (data) {
         setName(data.name)
+        setProductCode(data.product_code ?? '')
         setBarcode(data.internal_barcode ?? '')
+        setCostPrice(String(data.cost_price ?? data.default_unit_price ?? 0))
+        setSellingPrice(String(data.selling_price ?? 0))
+        setSupplier(data.supplier ?? '')
         setStock(String(data.current_stock))
-        setPrice(String(data.default_unit_price))
         setMemo(data.memo ?? '')
         setImageUrl(data.image_url ?? null)
         setImagePreview(data.image_url ?? null)
@@ -62,7 +68,6 @@ export function ProductFormPage() {
   const uploadImage = async (file: File): Promise<string | null> => {
     setUploading(true)
     try {
-      // ファイルサイズチェック（5MB上限）
       if (file.size > 5 * 1024 * 1024) {
         toast.error('画像は5MB以下にしてください')
         return null
@@ -81,7 +86,6 @@ export function ProductFormPage() {
 
       if (error) throw error
 
-      // 公開URLを取得
       const { data: urlData } = supabase.storage
         .from('product-images')
         .getPublicUrl(filePath)
@@ -100,29 +104,24 @@ export function ProductFormPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // ローカルプレビュー表示
     const reader = new FileReader()
     reader.onload = (ev) => {
       setImagePreview(ev.target?.result as string)
     }
     reader.readAsDataURL(file)
 
-    // Supabase Storage にアップロード
     const url = await uploadImage(file)
     if (url) {
       setImageUrl(url)
       toast.success('画像をアップロードしました')
     } else {
-      // アップロード失敗時はプレビューをクリア
       setImagePreview(imageUrl)
     }
 
-    // input をリセット
     e.target.value = ''
   }
 
   const handleRemoveImage = async () => {
-    // 古い画像をStorageから削除
     if (imageUrl) {
       try {
         const path = imageUrl.split('/product-images/')[1]
@@ -130,7 +129,7 @@ export function ProductFormPage() {
           await supabase.storage.from('product-images').remove([path])
         }
       } catch {
-        // 削除失敗は無視（古いURLの場合など）
+        // 削除失敗は無視
       }
     }
     setImageUrl(null)
@@ -146,10 +145,14 @@ export function ProductFormPage() {
     try {
       const payload = {
         name: name.trim(),
+        product_code: productCode.trim() || null,
         internal_barcode: barcode.trim() || null,
         image_url: imageUrl,
+        cost_price: parseInt(costPrice) || 0,
+        selling_price: parseInt(sellingPrice) || 0,
+        supplier: supplier.trim() || null,
         current_stock: parseInt(stock) || 0,
-        default_unit_price: parseInt(price) || 0,
+        default_unit_price: parseInt(costPrice) || 0,
         memo: memo.trim() || null,
       }
       if (isEdit) {
@@ -175,7 +178,6 @@ export function ProductFormPage() {
   const handleDelete = async () => {
     if (!id) return
     try {
-      // 画像も削除
       if (imageUrl) {
         try {
           const path = imageUrl.split('/product-images/')[1]
@@ -236,7 +238,7 @@ export function ProductFormPage() {
           </div>
           <div>
             <p className="text-lg font-bold tracking-tight">{isEdit ? '商品情報を編集' : '新しい商品を登録'}</p>
-            <p className="text-[13px] text-white/60">商品名・画像・バーコード・在庫数・単価</p>
+            <p className="text-[13px] text-white/60">商品名・画像・コード・価格・仕入れ先</p>
           </div>
         </div>
         <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
@@ -322,7 +324,6 @@ export function ProductFormPage() {
               </div>
             )}
 
-            {/* 画像がある場合の差し替えボタン */}
             {imagePreview && !uploading && (
               <div className="flex gap-2">
                 <Button
@@ -346,7 +347,6 @@ export function ProductFormPage() {
               </div>
             )}
 
-            {/* 隠しファイル入力 */}
             <input
               ref={cameraInputRef}
               type="file"
@@ -365,6 +365,27 @@ export function ProductFormPage() {
           </CardContent>
         </Card>
 
+        {/* 商品コード */}
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 dark:bg-cyan-950">
+                <Hash className="h-4 w-4 text-cyan-500" />
+              </div>
+              <Label htmlFor="productCode" className="text-sm font-semibold">商品コード</Label>
+            </div>
+            <Input
+              id="productCode"
+              value={productCode}
+              onChange={(e) => setProductCode(e.target.value)}
+              placeholder="SKU・型番など"
+              inputMode="text"
+              enterKeyHint="done"
+              className="rounded-xl font-mono bg-white dark:bg-white/5 border-border/60"
+            />
+          </CardContent>
+        </Card>
+
         {/* バーコード */}
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="p-5 space-y-2.5">
@@ -372,7 +393,7 @@ export function ProductFormPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950">
                 <Barcode className="h-4 w-4 text-violet-500" />
               </div>
-              <Label htmlFor="barcode" className="text-sm font-semibold">管理バーコード</Label>
+              <Label htmlFor="barcode" className="text-sm font-semibold">バーコード</Label>
             </div>
             <div className="flex gap-2">
               <Input
@@ -415,22 +436,22 @@ export function ProductFormPage() {
           </CardContent>
         </Card>
 
-        {/* 在庫数 & 単価 */}
+        {/* 仕入価格 & 販売価格 */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
             <CardContent className="p-5 space-y-2.5">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950">
-                  <Boxes className="h-4 w-4 text-emerald-500" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950">
+                  <JapaneseYen className="h-4 w-4 text-rose-500" />
                 </div>
-                <Label htmlFor="stock" className="text-sm font-semibold">現在庫数</Label>
+                <Label htmlFor="costPrice" className="text-sm font-semibold">仕入価格</Label>
               </div>
               <Input
-                id="stock"
+                id="costPrice"
                 type="number"
                 inputMode="numeric"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
                 className="rounded-xl text-center text-lg font-bold num-display bg-white dark:bg-white/5 border-border/60"
               />
             </CardContent>
@@ -441,19 +462,58 @@ export function ProductFormPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950">
                   <JapaneseYen className="h-4 w-4 text-amber-500" />
                 </div>
-                <Label htmlFor="price" className="text-sm font-semibold">単価 (円)</Label>
+                <Label htmlFor="sellingPrice" className="text-sm font-semibold">販売価格</Label>
               </div>
               <Input
-                id="price"
+                id="sellingPrice"
                 type="number"
                 inputMode="numeric"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value)}
                 className="rounded-xl text-center text-lg font-bold num-display bg-white dark:bg-white/5 border-border/60"
               />
             </CardContent>
           </Card>
         </div>
+
+        {/* 仕入れ先 */}
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950">
+                <Building2 className="h-4 w-4 text-teal-500" />
+              </div>
+              <Label htmlFor="supplier" className="text-sm font-semibold">仕入れ先</Label>
+            </div>
+            <Input
+              id="supplier"
+              value={supplier}
+              onChange={(e) => setSupplier(e.target.value)}
+              placeholder="仕入れ先名を入力"
+              className="rounded-xl bg-white dark:bg-white/5 border-border/60"
+            />
+          </CardContent>
+        </Card>
+
+        {/* 数量 */}
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-5 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950">
+                <Boxes className="h-4 w-4 text-emerald-500" />
+              </div>
+              <Label htmlFor="stock" className="text-sm font-semibold">数量</Label>
+            </div>
+            <Input
+              id="stock"
+              type="number"
+              inputMode="numeric"
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              className="rounded-xl text-center text-lg font-bold num-display bg-white dark:bg-white/5 border-border/60"
+            />
+          </CardContent>
+        </Card>
 
         {/* メモ */}
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">

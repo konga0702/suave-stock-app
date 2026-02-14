@@ -127,6 +127,9 @@ export function TransactionFormPage() {
           )
         )
       } else {
+        const autoPrice = type === 'IN'
+            ? Number(product.cost_price ?? product.default_unit_price ?? 0)
+            : Number(product.selling_price ?? product.default_unit_price ?? 0)
         setItems([
           ...items,
           {
@@ -134,7 +137,7 @@ export function TransactionFormPage() {
             product_name: product.name,
             product_image: product.image_url ?? null,
             quantity: 1,
-            price: Number(product.default_unit_price),
+            price: autoPrice,
           },
         ])
       }
@@ -380,7 +383,7 @@ export function TransactionFormPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold truncate">{p.name}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        在庫: {p.current_stock} / ¥{Number(p.default_unit_price).toLocaleString()}
+                        在庫: {p.current_stock} / {isIN ? '仕入' : '販売'}¥{Number(isIN ? (p.cost_price ?? p.default_unit_price ?? 0) : (p.selling_price ?? p.default_unit_price ?? 0)).toLocaleString()}
                       </p>
                     </div>
                     <Plus className="h-4 w-4 shrink-0 text-muted-foreground/40" />
