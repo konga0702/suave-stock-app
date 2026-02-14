@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Barcode, Upload, Download, Package } from 'lucide-react'
+import { Plus, Search, Barcode, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,6 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { BarcodeDisplay } from '@/components/BarcodeDisplay'
 import { supabase } from '@/lib/supabase'
@@ -21,6 +31,10 @@ export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [search, setSearch] = useState('')
   const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const loadProducts = useCallback(async () => {
     const { data } = await supabase
@@ -70,22 +84,148 @@ export function ProductsPage() {
     return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
   }
 
+  // 選択モード切り替え
+  const toggleSelectMode = () => {
+    if (selectMode) {
+      setSelectMode(false)
+      setSelectedIds(new Set())
+    } else {
+      setSelectMode(true)
+    }
+  }
+
+  // 個別の選択/解除
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  // 全選択/全解除
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map((p) => p.id)))
+    }
+  }
+
+  // 一括削除
+  const handleBulkDelete = async () => {
+    setDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      let deletedCount = 0
+
+      for (const id of ids) {
+        // 画像を削除
+        const product = products.find((p) => p.id === id)
+        if (product?.image_url) {
+          try {
+            const path = product.image_url.split('/product-images/')[1]
+            if (path) {
+              await supabase.storage.from('product-images').remove([path])
+            }
+          } catch {
+            // 無視
+          }
+        }
+
+        // 在庫個体データを削除
+        await supabase.from('inventory_items').delete().eq('product_id', id)
+
+        // 取引明細を削除
+        await supabase.from('transaction_items').delete().eq('product_id', id)
+
+        // 商品を削除
+        const { error } = await supabase.from('products').delete().eq('id', id)
+        if (!error) deletedCount++
+      }
+
+      // 空になった取引を削除
+      const { data: allTxs } = await supabase.from('transactions').select('id')
+      if (allTxs) {
+        for (const tx of allTxs) {
+          const { count } = await supabase
+            .from('transaction_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('transaction_id', tx.id)
+          if (count === 0) {
+            await supabase.from('transactions').delete().eq('id', tx.id)
+          }
+        }
+      }
+
+      toast.success(`${deletedCount}件の商品を削除しました`)
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      setShowDeleteConfirm(false)
+      loadProducts()
+    } catch {
+      toast.error('削除に失敗しました')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const isAllSelected = filtered.length > 0 && selectedIds.size === filtered.length
+
   return (
     <div className="page-transition space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">商品一覧</h1>
         <div className="flex gap-1.5">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
-            <Upload className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => exportProductsCsv(products)} title="CSVエクスポート">
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-slate-800 text-white shadow-sm hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all">
-            <Link to="/products/new">
-              <Plus className="h-4 w-4" />
-            </Link>
-          </Button>
+          {!selectMode ? (
+            <>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
+                <Upload className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => exportProductsCsv(products)} title="CSVエクスポート">
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={toggleSelectMode}
+                title="選択モード"
+              >
+                <CheckSquare className="h-4 w-4" />
+              </Button>
+              <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-slate-800 text-white shadow-sm hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all">
+                <Link to="/products/new">
+                  <Plus className="h-4 w-4" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl border-border/60 text-xs font-semibold hover:bg-accent transition-colors"
+                onClick={toggleSelectAll}
+              >
+                <CheckCheck className="mr-1.5 h-4 w-4" />
+                {isAllSelected ? '全解除' : '全選択'}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={toggleSelectMode}
+                title="選択モード終了"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -120,9 +260,24 @@ export function ProductsPage() {
               key={product.id}
               className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
                 index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-              }`}
+              } ${selectMode && selectedIds.has(product.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20' : ''}`}
+              onClick={selectMode ? () => toggleSelect(product.id) : undefined}
             >
               <CardContent className="flex items-center gap-3.5 p-4">
+                {/* 選択モード時のチェックボックス */}
+                {selectMode && (
+                  <div className="shrink-0">
+                    {selectedIds.has(product.id) ? (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500 text-white">
+                        <CheckSquare className="h-4 w-4" />
+                      </div>
+                    ) : (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-border/60">
+                        <Square className="h-4 w-4 text-transparent" />
+                      </div>
+                    )}
+                  </div>
+                )}
                 {product.image_url ? (
                   <div className="h-11 w-11 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
                     <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
@@ -133,12 +288,16 @@ export function ProductsPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <Link
-                    to={`/products/${product.id}/edit`}
-                    className="block text-[13px] font-semibold hover:text-slate-600 dark:hover:text-slate-300 truncate transition-colors"
-                  >
-                    {product.name}
-                  </Link>
+                  {selectMode ? (
+                    <p className="text-[13px] font-semibold truncate">{product.name}</p>
+                  ) : (
+                    <Link
+                      to={`/products/${product.id}/edit`}
+                      className="block text-[13px] font-semibold hover:text-slate-600 dark:hover:text-slate-300 truncate transition-colors"
+                    >
+                      {product.name}
+                    </Link>
+                  )}
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                     {product.product_code && (
                       <span className="font-mono text-[11px] text-muted-foreground/70">{product.product_code}</span>
@@ -152,29 +311,71 @@ export function ProductsPage() {
                     <span className="text-amber-600 dark:text-amber-400 font-semibold num-display">売¥{Number(product.selling_price ?? 0).toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className={`rounded-xl px-3 py-1.5 text-center ${getStockColor(product.current_stock)}`}>
-                    <div className="text-base font-bold leading-tight num-display">
-                      {product.current_stock}
+                {!selectMode && (
+                  <div className="flex items-center gap-2">
+                    <div className={`rounded-xl px-3 py-1.5 text-center ${getStockColor(product.current_stock)}`}>
+                      <div className="text-base font-bold leading-tight num-display">
+                        {product.current_stock}
+                      </div>
+                      <div className="text-[9px] font-medium leading-tight opacity-70">在庫</div>
                     </div>
-                    <div className="text-[9px] font-medium leading-tight opacity-70">在庫</div>
+                    {product.internal_barcode && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground/50 hover:text-slate-600 transition-colors"
+                        onClick={() => setBarcodeProduct(product)}
+                      >
+                        <Barcode className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  {product.internal_barcode && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground/50 hover:text-slate-600 transition-colors"
-                      onClick={() => setBarcodeProduct(product)}
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                )}
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      {/* 選択モード時のフローティング削除バー */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-50 animate-fade-in">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-800 dark:bg-slate-200 p-4 shadow-xl shadow-slate-900/30">
+            <p className="text-sm font-semibold text-white dark:text-slate-900">
+              {selectedIds.size}件選択中
+            </p>
+            <Button
+              className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all text-xs font-semibold"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              まとめて削除
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 一括削除確認ダイアログ */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{selectedIds.size}件の商品を削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作は取り消せません。選択した商品と関連する入出庫データ・在庫データも全て削除されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={deleting}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-rose-500 hover:bg-rose-600 rounded-xl"
+              disabled={deleting}
+            >
+              {deleting ? '削除中...' : `${selectedIds.size}件を削除`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* バーコード表示ダイアログ */}
       <Dialog open={!!barcodeProduct} onOpenChange={() => setBarcodeProduct(null)}>
