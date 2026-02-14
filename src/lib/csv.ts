@@ -242,25 +242,247 @@ export function exportTransactionsCsv(_transactions: Transaction[]) {
   exportTransactionsDetailCsv()
 }
 
+/**
+ * 入出庫CSVインポート（新フォーマット対応）
+ * CSV形式: 日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,メモ
+ *
+ * 同じ管理番号の行はひとつの取引にまとめられる。
+ * 管理番号が空の場合は行ごとに個別の取引として登録。
+ * 商品名で products テーブルから自動マッチする。
+ */
 export async function importTransactionsCsv(text: string) {
   const rows = parseCsvRows(text)
-  const dataRows = rows.slice(1).filter((r) => r.length >= 3 && r[0])
+  if (rows.length < 2) throw new Error('CSVにデータがありません')
 
-  const inserts = dataRows.map((r) => ({
-    type: r[0] as 'IN' | 'OUT',
-    status: (r[1] || 'SCHEDULED') as 'SCHEDULED' | 'COMPLETED',
-    category: r[2],
-    date: r[3] || new Date().toISOString().split('T')[0],
-    tracking_number: r[4] || null,
-    order_code: r[5] || null,
-    shipping_code: r[6] || null,
-    partner_name: r[7] || null,
-    total_amount: parseInt(r[8]) || 0,
-    memo: r[9] || null,
-  }))
+  const header = rows[0]
+  const dataRows = rows.slice(1).filter((r) => r.length >= 4 && r.some((c) => c))
 
-  const { error } = await supabase.from('transactions').insert(inserts)
-  if (error) throw error
+  if (dataRows.length === 0) throw new Error('インポートするデータがありません')
+
+  // 新フォーマット判定: 1列目が「日付」
+  const isNewFormat = header[0] === '日付' && (header[1] === '区分' || header[1] === 'タイプ')
+
+  if (!isNewFormat) {
+    // 旧フォーマット (type,status,category,date,...) — 後方互換
+    const inserts = dataRows.map((r) => ({
+      type: r[0] as 'IN' | 'OUT',
+      status: (r[1] || 'SCHEDULED') as 'SCHEDULED' | 'COMPLETED',
+      category: r[2],
+      date: r[3] || new Date().toISOString().split('T')[0],
+      tracking_number: r[4] || null,
+      order_code: r[5] || null,
+      shipping_code: r[6] || null,
+      partner_name: r[7] || null,
+      total_amount: parseInt(r[8]) || 0,
+      memo: r[9] || null,
+    }))
+    const { error } = await supabase.from('transactions').insert(inserts)
+    if (error) throw error
+    return inserts.length
+  }
+
+  // --- 新フォーマット処理 ---
+
+  // 商品テーブルを取得（名前 → id マッピング）
+  const { data: products } = await supabase.from('products').select('id, name, product_code')
+  const productMap = new Map<string, string>() // name(lower) → id
+  const codeMap = new Map<string, string>()    // product_code(lower) → id
+  if (products) {
+    for (const p of products) {
+      productMap.set(p.name.toLowerCase(), p.id)
+      if (p.product_code) codeMap.set(p.product_code.toLowerCase(), p.id)
+    }
+  }
+
+  // 区分テキスト → type 変換
+  function parseType(val: string): 'IN' | 'OUT' {
+    const v = val.trim()
+    if (v === '入庫' || v === 'IN') return 'IN'
+    if (v === '出庫' || v === 'OUT') return 'OUT'
+    return 'IN'
+  }
+
+  // カテゴリのデフォルト
+  function defaultCategory(type: 'IN' | 'OUT'): string {
+    return type === 'IN' ? '入荷' : '出荷'
+  }
+
+  // 行をパース
+  interface ParsedRow {
+    date: string
+    type: 'IN' | 'OUT'
+    category: string
+    productName: string
+    quantity: number
+    price: number
+    partnerName: string | null
+    trackingNumber: string | null
+    orderCode: string | null
+    shippingCode: string | null
+    memo: string | null
+  }
+
+  // 連続行の結合（日付が空欄 = 前の行の取引に属する明細）
+  const parsedRows: ParsedRow[] = []
+  let lastBase: Omit<ParsedRow, 'productName' | 'quantity' | 'price'> | null = null
+
+  for (const r of dataRows) {
+    const date = r[0]?.trim()
+    const typeStr = r[1]?.trim()
+    const cat = r[2]?.trim()
+
+    if (date) {
+      // 新しい取引の開始行
+      const type = parseType(typeStr)
+      lastBase = {
+        date,
+        type,
+        category: cat || defaultCategory(type),
+        partnerName: r[6]?.trim() || null,
+        trackingNumber: r[7]?.trim() || null,
+        orderCode: r[8]?.trim() || null,
+        shippingCode: r[9]?.trim() || null,
+        memo: r[10]?.trim() || null,
+      }
+    }
+
+    if (!lastBase) continue
+
+    const productName = r[3]?.trim()
+    if (!productName) continue
+
+    parsedRows.push({
+      ...lastBase,
+      // 日付行でない場合でも基本情報は lastBase から引き継ぐ
+      productName,
+      quantity: parseNum(r[4]),
+      price: parseNum(r[5]),
+    })
+  }
+
+  if (parsedRows.length === 0) throw new Error('インポートするデータがありません')
+
+  // 取引ごとにグループ化（日付+区分+管理番号+注文コード でグルーピング）
+  interface TxGroup {
+    date: string
+    type: 'IN' | 'OUT'
+    category: string
+    partnerName: string | null
+    trackingNumber: string | null
+    orderCode: string | null
+    shippingCode: string | null
+    memo: string | null
+    items: Array<{ productName: string; quantity: number; price: number }>
+  }
+
+  const groups: TxGroup[] = []
+  let currentGroup: TxGroup | null = null
+
+  for (const row of parsedRows) {
+    const groupKey = `${row.date}|${row.type}|${row.trackingNumber ?? ''}|${row.orderCode ?? ''}`
+    const prevKey = currentGroup
+      ? `${currentGroup.date}|${currentGroup.type}|${currentGroup.trackingNumber ?? ''}|${currentGroup.orderCode ?? ''}`
+      : ''
+
+    if (currentGroup && groupKey === prevKey) {
+      // 同じ取引に明細追加
+      currentGroup.items.push({
+        productName: row.productName,
+        quantity: row.quantity,
+        price: row.price,
+      })
+    } else {
+      // 新しい取引グループ
+      currentGroup = {
+        date: row.date,
+        type: row.type,
+        category: row.category,
+        partnerName: row.partnerName,
+        trackingNumber: row.trackingNumber,
+        orderCode: row.orderCode,
+        shippingCode: row.shippingCode,
+        memo: row.memo,
+        items: [{
+          productName: row.productName,
+          quantity: row.quantity,
+          price: row.price,
+        }],
+      }
+      groups.push(currentGroup)
+    }
+  }
+
+  // 商品名が見つからない場合のエラー収集
+  const notFound: string[] = []
+
+  // 各グループをトランザクション + 明細として登録
+  let txCount = 0
+  for (const group of groups) {
+    // 明細の商品IDを解決
+    const resolvedItems: Array<{ product_id: string; quantity: number; price: number }> = []
+    for (const item of group.items) {
+      const pid =
+        productMap.get(item.productName.toLowerCase()) ??
+        codeMap.get(item.productName.toLowerCase())
+
+      if (!pid) {
+        if (!notFound.includes(item.productName)) notFound.push(item.productName)
+        continue
+      }
+      resolvedItems.push({
+        product_id: pid,
+        quantity: item.quantity || 1,
+        price: item.price,
+      })
+    }
+
+    if (resolvedItems.length === 0) continue
+
+    const totalAmount = resolvedItems.reduce((s, i) => s + i.quantity * i.price, 0)
+
+    // トランザクション登録
+    const { data: newTx, error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        type: group.type,
+        status: 'SCHEDULED' as const,
+        category: group.category,
+        date: group.date,
+        tracking_number: group.trackingNumber,
+        order_code: group.orderCode,
+        shipping_code: group.shippingCode,
+        partner_name: group.partnerName,
+        total_amount: totalAmount,
+        memo: group.memo,
+      })
+      .select()
+      .single()
+
+    if (txError || !newTx) throw txError ?? new Error('取引の登録に失敗しました')
+
+    // 明細登録
+    const { error: itemsError } = await supabase
+      .from('transaction_items')
+      .insert(
+        resolvedItems.map((item) => ({
+          transaction_id: newTx.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      )
+
+    if (itemsError) throw itemsError
+    txCount++
+  }
+
+  if (notFound.length > 0) {
+    throw new Error(
+      `${txCount}件の取引を登録しました。\n以下の商品名が見つかりませんでした:\n${notFound.join(', ')}`
+    )
+  }
+
+  return txCount
 }
 
 // ---- Inventory CSV ----

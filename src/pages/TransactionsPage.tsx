@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -108,11 +108,18 @@ export function TransactionsPage() {
       if (!file) return
       try {
         const text = await file.text()
-        await importTransactionsCsv(text)
-        toast.success('インポート完了')
+        const count = await importTransactionsCsv(text)
+        toast.success(`${count}件の取引をインポートしました`)
         load()
-      } catch {
-        toast.error('インポートに失敗しました')
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'インポートに失敗しました'
+        if (msg.includes('件の取引を登録しました')) {
+          // 一部成功・一部商品名見つからず
+          toast.warning(msg, { duration: 8000 })
+          load()
+        } else {
+          toast.error(msg)
+        }
       }
     }
     input.click()
@@ -140,6 +147,11 @@ export function TransactionsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">入出庫</h1>
         <div className="flex gap-1.5">
+          <a href="/transactions_template.csv" download className="inline-flex">
+            <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" title="CSVテンプレート">
+              <FileDown className="h-4 w-4" />
+            </Button>
+          </a>
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
             <Upload className="h-4 w-4" />
           </Button>
