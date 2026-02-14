@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Barcode, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, ArrowDownWideNarrow, ArrowUpWideNarrow, Filter } from 'lucide-react'
+import { Plus, Search, Barcode, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
