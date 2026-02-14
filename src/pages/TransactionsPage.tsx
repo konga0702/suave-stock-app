@@ -235,7 +235,7 @@ export function TransactionsPage() {
                     <CardContent className="flex items-center gap-3.5 p-4">
                       {/* 商品画像 or タイプアイコン */}
                       {tx.firstProductImage ? (
-                        <div className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                        <div className={`relative h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
                           isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
                         }`}>
                           <img src={tx.firstProductImage} alt="" className="h-full w-full object-cover" />
@@ -250,7 +250,7 @@ export function TransactionsPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded ${
                           isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
                         }`}>
                           {isIN ? (

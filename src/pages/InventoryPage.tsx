@@ -135,13 +135,13 @@ export function InventoryPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3.5">
                     {item.product?.image_url ? (
-                      <div className={`mt-0.5 h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                      <div className={`mt-0.5 h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
                         item.status === 'IN_STOCK' ? 'border-violet-200 dark:border-violet-800' : 'border-slate-200 dark:border-slate-700'
                       }`}>
                         <img src={item.product.image_url} alt={item.product.name} className="h-full w-full object-cover" />
                       </div>
                     ) : (
-                      <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                      <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded ${
                         item.status === 'IN_STOCK' ? 'bg-violet-50 dark:bg-violet-950' : 'bg-slate-100 dark:bg-slate-800'
                       }`}>
                         {item.status === 'IN_STOCK' ? (

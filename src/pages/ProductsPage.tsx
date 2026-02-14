@@ -119,11 +119,11 @@ export function ProductsPage() {
             >
               <CardContent className="flex items-center gap-3.5 p-4">
                 {product.image_url ? (
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
+                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
                     <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
                     <Package className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                   </div>
                 )}

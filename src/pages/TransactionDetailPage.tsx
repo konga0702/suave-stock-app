@@ -362,13 +362,13 @@ export function TransactionDetailPage() {
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 {item.product?.image_url ? (
-                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 ${
+                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded border-2 ${
                     isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
                   }`}>
                     <img src={item.product.image_url} alt={item.product.name} className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${
                     isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
                   }`}>
                     {isIN ? (

@@ -369,11 +369,11 @@ export function TransactionFormPage() {
                     }`}
                   >
                     {p.image_url ? (
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
                         <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
                       </div>
                     ) : (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
                         <Package className="h-4 w-4 text-slate-400" />
                       </div>
                     )}
@@ -395,13 +395,13 @@ export function TransactionFormPage() {
                 isIN ? 'border-sky-100 bg-sky-50/30 dark:border-sky-900 dark:bg-sky-950/30' : 'border-amber-100 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/30'
               }`}>
                 {item.product_image ? (
-                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded-xl border ${
+                  <div className={`h-10 w-10 shrink-0 overflow-hidden rounded border ${
                     isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
                   }`}>
                     <img src={item.product_image} alt={item.product_name} className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${
                     isIN ? 'bg-sky-100/50 dark:bg-sky-950/50' : 'bg-amber-100/50 dark:bg-amber-950/50'
                   }`}>
                     <Package className="h-4 w-4 text-muted-foreground/50" />
