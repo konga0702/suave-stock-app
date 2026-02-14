@@ -178,6 +178,7 @@ export function ProductFormPage() {
   const handleDelete = async () => {
     if (!id) return
     try {
+      // 1. 画像を削除
       if (imageUrl) {
         try {
           const path = imageUrl.split('/product-images/')[1]
@@ -188,12 +189,34 @@ export function ProductFormPage() {
           // 無視
         }
       }
+
+      // 2. 在庫個体データを削除
+      await supabase.from('inventory_items').delete().eq('product_id', id)
+
+      // 3. 取引明細を削除
+      await supabase.from('transaction_items').delete().eq('product_id', id)
+
+      // 4. 明細がなくなった空の取引を削除
+      const { data: allTxs } = await supabase.from('transactions').select('id')
+      if (allTxs) {
+        for (const tx of allTxs) {
+          const { count } = await supabase
+            .from('transaction_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('transaction_id', tx.id)
+          if (count === 0) {
+            await supabase.from('transactions').delete().eq('id', tx.id)
+          }
+        }
+      }
+
+      // 5. 商品を削除
       const { error } = await supabase.from('products').delete().eq('id', id)
       if (error) throw error
-      toast.success('商品を削除しました')
+      toast.success('商品と関連データを削除しました')
       navigate('/products')
     } catch {
-      toast.error('削除に失敗しました。入出庫データが存在する可能性があります。')
+      toast.error('削除に失敗しました')
     }
   }
 
@@ -218,7 +241,7 @@ export function ProductFormPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>商品を削除しますか？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  この操作は取り消せません。入出庫データがある場合は削除できません。
+                  この操作は取り消せません。関連する入出庫データ・在庫データも全て削除されます。
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
