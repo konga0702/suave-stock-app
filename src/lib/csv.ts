@@ -25,7 +25,9 @@ function esc(value: string | number | null | undefined): string {
 }
 
 function parseCsvRows(text: string): string[][] {
-  const lines = text.trim().split('\n')
+  // BOM除去 + 改行コード統一(CRLF→LF)
+  const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = cleaned.trim().split('\n')
   return lines.map((line) => {
     const row: string[] = []
     let current = ''
