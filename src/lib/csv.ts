@@ -81,6 +81,14 @@ export function exportProductsCsv(products: Product[]) {
   )
 }
 
+// 数値パース: ¥マーク・カンマ・スペース・$を除去してから数値変換
+function parseNum(value: string | undefined): number {
+  if (!value) return 0
+  const cleaned = value.replace(/[¥￥$,、\s]/g, '')
+  const num = parseInt(cleaned)
+  return isNaN(num) ? 0 : num
+}
+
 export async function importProductsCsv(text: string) {
   const rows = parseCsvRows(text)
   if (rows.length < 2) throw new Error('CSVにデータがありません')
@@ -98,11 +106,11 @@ export async function importProductsCsv(text: string) {
         name: r[0],
         product_code: null,
         internal_barcode: r[1] || null,
-        cost_price: parseInt(r[3]) || 0,
+        cost_price: parseNum(r[3]),
         selling_price: 0,
-        default_unit_price: parseInt(r[3]) || 0,
+        default_unit_price: parseNum(r[3]),
         supplier: null,
-        current_stock: parseInt(r[2]) || 0,
+        current_stock: parseNum(r[2]),
         memo: r[4] || null,
       }
     } else {
@@ -111,11 +119,11 @@ export async function importProductsCsv(text: string) {
         name: r[0],
         product_code: r[1] || null,
         internal_barcode: r[2] || null,
-        cost_price: parseInt(r[3]) || 0,
-        selling_price: parseInt(r[4]) || 0,
-        default_unit_price: parseInt(r[3]) || 0,
+        cost_price: parseNum(r[3]),
+        selling_price: parseNum(r[4]),
+        default_unit_price: parseNum(r[3]),
         supplier: r[5] || null,
-        current_stock: parseInt(r[6]) || 0,
+        current_stock: parseNum(r[6]),
         memo: r[7] || null,
       }
     }
