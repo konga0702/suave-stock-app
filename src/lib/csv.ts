@@ -81,22 +81,49 @@ export function exportProductsCsv(products: Product[]) {
 
 export async function importProductsCsv(text: string) {
   const rows = parseCsvRows(text)
+  if (rows.length < 2) throw new Error('CSVにデータがありません')
+
+  const header = rows[0]
   const dataRows = rows.slice(1).filter((r) => r.length >= 1 && r[0])
 
-  const inserts = dataRows.map((r) => ({
-    name: r[0],
-    product_code: r[1] || null,
-    internal_barcode: r[2] || null,
-    cost_price: parseInt(r[3]) || 0,
-    selling_price: parseInt(r[4]) || 0,
-    default_unit_price: parseInt(r[3]) || 0,
-    supplier: r[5] || null,
-    current_stock: parseInt(r[6]) || 0,
-    memo: r[7] || null,
-  }))
+  // ヘッダーで旧/新フォーマットを自動判定
+  const isOldFormat = header.length <= 5 || header[0] === '商品名' && header[1] === '管理バーコード'
+
+  const inserts = dataRows.map((r) => {
+    if (isOldFormat) {
+      // 旧: 商品名,管理バーコード,現在庫,単価,メモ
+      return {
+        name: r[0],
+        product_code: null,
+        internal_barcode: r[1] || null,
+        cost_price: parseInt(r[3]) || 0,
+        selling_price: 0,
+        default_unit_price: parseInt(r[3]) || 0,
+        supplier: null,
+        current_stock: parseInt(r[2]) || 0,
+        memo: r[4] || null,
+      }
+    } else {
+      // 新: 商品名,商品コード,バーコード,仕入価格,販売価格,仕入れ先,数量,メモ
+      return {
+        name: r[0],
+        product_code: r[1] || null,
+        internal_barcode: r[2] || null,
+        cost_price: parseInt(r[3]) || 0,
+        selling_price: parseInt(r[4]) || 0,
+        default_unit_price: parseInt(r[3]) || 0,
+        supplier: r[5] || null,
+        current_stock: parseInt(r[6]) || 0,
+        memo: r[7] || null,
+      }
+    }
+  })
+
+  if (inserts.length === 0) throw new Error('インポートするデータがありません')
 
   const { error } = await supabase.from('products').insert(inserts)
   if (error) throw error
+  return inserts.length
 }
 
 // ---- Transactions CSV (詳細版: 商品名・数量・単価を含む) ----

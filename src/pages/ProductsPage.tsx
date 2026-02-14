@@ -53,11 +53,12 @@ export function ProductsPage() {
       if (!file) return
       try {
         const text = await file.text()
-        await importProductsCsv(text)
-        toast.success('インポート完了')
+        const count = await importProductsCsv(text)
+        toast.success(`${count}件の商品をインポートしました`)
         loadProducts()
-      } catch {
-        toast.error('インポートに失敗しました')
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'インポートに失敗しました'
+        toast.error(msg)
       }
     }
     input.click()
