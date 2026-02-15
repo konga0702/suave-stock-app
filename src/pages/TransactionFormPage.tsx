@@ -163,6 +163,16 @@ export function TransactionFormPage() {
     }
     setSaving(true)
     try {
+      // 商品コードが入力・変更された場合、productsテーブルも更新
+      for (const item of items) {
+        if (item.product_code.trim()) {
+          await supabase
+            .from('products')
+            .update({ product_code: item.product_code.trim() })
+            .eq('id', item.product_id)
+        }
+      }
+
       const txPayload = {
         type,
         status: 'SCHEDULED' as const,
@@ -420,9 +430,14 @@ export function TransactionFormPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold truncate">{item.product_name}</p>
-                  {item.product_code && (
-                    <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{item.product_code}</p>
-                  )}
+                  <div className="mt-1.5">
+                    <Input
+                      value={item.product_code}
+                      onChange={(e) => updateItem(index, 'product_code', e.target.value)}
+                      placeholder="商品コードを入力..."
+                      className="h-7 rounded-lg text-[11px] font-mono bg-white dark:bg-white/5 border-border/60 px-2"
+                    />
+                  </div>
                   <div className="mt-2 flex items-center gap-2">
                     <Input
                       type="number"
