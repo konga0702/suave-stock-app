@@ -23,6 +23,7 @@ import type { Product, TransactionType, TransactionCategory } from '@/types/data
 interface ItemRow {
   product_id: string
   product_name: string
+  product_code: string
   product_image: string | null
   quantity: number
   price: number
@@ -83,16 +84,17 @@ export function TransactionFormPage() {
 
       const { data: txItems } = await supabase
         .from('transaction_items')
-        .select('*, product:products(name, image_url)')
+        .select('*, product:products(name, image_url, product_code)')
         .eq('transaction_id', id)
 
       if (txItems) {
         setItems(
           txItems.map((item) => {
-            const product = item.product as unknown as { name: string; image_url: string | null } | null
+            const product = item.product as unknown as { name: string; image_url: string | null; product_code: string | null } | null
             return {
               product_id: item.product_id,
               product_name: product?.name ?? '',
+              product_code: product?.product_code ?? '',
               product_image: product?.image_url ?? null,
               quantity: item.quantity,
               price: Number(item.price),
@@ -135,6 +137,7 @@ export function TransactionFormPage() {
           {
             product_id: product.id,
             product_name: product.name,
+            product_code: product.product_code ?? '',
             product_image: product.image_url ?? null,
             quantity: 1,
             price: autoPrice,
@@ -243,10 +246,12 @@ export function TransactionFormPage() {
     }
   }
 
-  // 商品フィルター
-  const filteredProducts = products.filter((p) =>
-    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
-  )
+  // 商品フィルター（商品名・商品コードで検索）
+  const filteredProducts = products.filter((p) => {
+    if (!productSearch) return true
+    const q = productSearch.toLowerCase()
+    return p.name.toLowerCase().includes(q) || (p.product_code ?? '').toLowerCase().includes(q)
+  })
 
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
@@ -336,7 +341,7 @@ export function TransactionFormPage() {
               <Input
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="商品名で検索..."
+                placeholder="商品名・商品コードで検索..."
                 inputMode="text"
                 enterKeyHint="done"
                 className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60"
@@ -382,6 +387,9 @@ export function TransactionFormPage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold truncate">{p.name}</p>
+                      {p.product_code && (
+                        <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{p.product_code}</p>
+                      )}
                       <p className="text-[11px] text-muted-foreground">
                         在庫: {p.current_stock} / {isIN ? '仕入' : '販売'}¥{Number(isIN ? (p.cost_price ?? p.default_unit_price ?? 0) : (p.selling_price ?? p.default_unit_price ?? 0)).toLocaleString()}
                       </p>
@@ -412,6 +420,9 @@ export function TransactionFormPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold truncate">{item.product_name}</p>
+                  {item.product_code && (
+                    <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{item.product_code}</p>
+                  )}
                   <div className="mt-2 flex items-center gap-2">
                     <Input
                       type="number"
