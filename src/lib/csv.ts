@@ -490,7 +490,7 @@ export async function importTransactionsCsv(text: string) {
 export function exportInventoryCsv(items: InventoryItem[]) {
   const header = '商品名,管理番号,注文コード,追跡コード,ステータス,入庫日,出荷日,取引先,メモ'
   const rows = items.map((item) => {
-    const statusName = item.status === 'IN_STOCK' ? '在庫中' : '出荷済'
+    const statusName = item.status === 'IN_STOCK' ? '入荷済' : '出荷済'
     return [
       esc(item.product?.name),
       esc(item.tracking_number),

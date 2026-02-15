@@ -106,7 +106,7 @@ export function InventoryPage() {
         <TabsList className="w-full rounded-xl bg-muted/50 p-1">
           <TabsTrigger value="IN_STOCK" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">
             <Package className="mr-1 h-3 w-3" />
-            在庫中
+            入荷済
           </TabsTrigger>
           <TabsTrigger value="SHIPPED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">
             <ArrowUpFromLine className="mr-1 h-3 w-3" />
@@ -123,7 +123,7 @@ export function InventoryPage() {
                 {search
                   ? '検索結果がありません'
                   : tab === 'IN_STOCK'
-                    ? '在庫中の個体はありません'
+                    ? '入荷済の個体はありません'
                     : '出荷済みの個体はありません'}
               </p>
             </div>
@@ -161,7 +161,7 @@ export function InventoryPage() {
                             ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400'
                         }`}>
-                          {item.status === 'IN_STOCK' ? '在庫中' : '出荷済'}
+                          {item.status === 'IN_STOCK' ? '入荷済' : '出荷済'}
                         </Badge>
                       </div>
                       <p className="mt-0.5 font-mono text-[11px] text-violet-500 truncate">
