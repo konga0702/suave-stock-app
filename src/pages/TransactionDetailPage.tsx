@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText, User, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -158,6 +158,8 @@ export function TransactionDetailPage() {
           order_code: null,
           shipping_code: null,
           partner_name: tx.partner_name,
+          customer_name: tx.customer_name,
+          order_date: tx.order_date,
           total_amount: tx.total_amount,
           memo: tx.memo ? `[複製] ${tx.memo}` : '[複製]',
         })
@@ -328,6 +330,36 @@ export function TransactionDetailPage() {
                 <div>
                   <p className="text-[10px] font-medium text-sky-500">追跡コード</p>
                   <p className="font-mono text-sm">{tx.shipping_code}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 顧客名・注文日 */}
+      {(tx.customer_name || tx.order_date) && (
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3 p-5">
+            {tx.customer_name && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950">
+                  <User className="h-4 w-4 text-indigo-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-indigo-500">顧客名</p>
+                  <p className="text-sm">{tx.customer_name}</p>
+                </div>
+              </div>
+            )}
+            {tx.order_date && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950">
+                  <CalendarDays className="h-4 w-4 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-teal-500">注文日</p>
+                  <p className="text-sm">{tx.order_date}</p>
                 </div>
               </div>
             )}

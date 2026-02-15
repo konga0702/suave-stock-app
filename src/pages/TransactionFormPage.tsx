@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package,
+  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package, User, CalendarDays,
 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,8 @@ export function TransactionFormPage() {
   const [orderCode, setOrderCode] = useState('')
   const [shippingCode, setShippingCode] = useState('')
   const [partnerName, setPartnerName] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [orderDate, setOrderDate] = useState('')
   const [memo, setMemo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -80,6 +82,8 @@ export function TransactionFormPage() {
       setOrderCode(tx.order_code ?? '')
       setShippingCode(tx.shipping_code ?? '')
       setPartnerName(tx.partner_name ?? '')
+      setCustomerName(tx.customer_name ?? '')
+      setOrderDate(tx.order_date ?? '')
       setMemo(tx.memo ?? '')
 
       const { data: txItems } = await supabase
@@ -182,6 +186,8 @@ export function TransactionFormPage() {
         order_code: orderCode.trim() || null,
         shipping_code: shippingCode.trim() || null,
         partner_name: partnerName.trim() || null,
+        customer_name: customerName.trim() || null,
+        order_date: orderDate || null,
         total_amount: totalAmount,
         memo: memo.trim() || null,
       }
@@ -623,13 +629,39 @@ export function TransactionFormPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground" htmlFor="partner">
-                {isIN ? '取引先 (仕入先)' : '取引先 (顧客名)'}
+                {isIN ? '取引先 (仕入先)' : '取引先'}
               </Label>
               <Input
                 id="partner"
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
-                placeholder={isIN ? '仕入先名' : '顧客名'}
+                placeholder={isIN ? '仕入先名' : '販売先名'}
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <User className="h-3 w-3 text-indigo-500" />
+                <Label className="text-xs text-muted-foreground" htmlFor="customerName">顧客名</Label>
+              </div>
+              <Input
+                id="customerName"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="顧客名・購入者名"
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3 text-teal-500" />
+                <Label className="text-xs text-muted-foreground" htmlFor="orderDate">注文日</Label>
+              </div>
+              <Input
+                id="orderDate"
+                type="date"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
                 className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
