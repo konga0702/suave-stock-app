@@ -7,6 +7,7 @@ import { TransactionsPage } from '@/pages/TransactionsPage'
 import { TransactionFormPage } from '@/pages/TransactionFormPage'
 import { TransactionDetailPage } from '@/pages/TransactionDetailPage'
 import { InventoryPage } from '@/pages/InventoryPage'
+import { NetStockPage } from '@/pages/NetStockPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProfitDashboardPage } from '@/pages/ProfitDashboardPage'
 import { TestBarcodesPage } from '@/pages/TestBarcodesPage'
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/transactions/:id" element={<TransactionDetailPage />} />
           <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/net-stock" element={<NetStockPage />} />
           <Route path="/profit" element={<ProfitDashboardPage />} />
           <Route path="/test-barcodes" element={<TestBarcodesPage />} />
         </Routes>

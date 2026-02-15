@@ -65,6 +65,7 @@ export function DashboardPage() {
       iconBg: 'bg-slate-100 dark:bg-slate-800',
       iconColor: 'text-slate-600 dark:text-slate-300',
       valueColor: '',
+      href: '/products',
     },
     {
       label: '純在庫数',
@@ -73,6 +74,7 @@ export function DashboardPage() {
       iconBg: 'bg-emerald-50 dark:bg-emerald-950',
       iconColor: 'text-emerald-500',
       valueColor: 'text-emerald-600 dark:text-emerald-400',
+      href: '/net-stock',
     },
     {
       label: '入庫予定',
@@ -81,6 +83,7 @@ export function DashboardPage() {
       iconBg: 'bg-sky-50 dark:bg-sky-950',
       iconColor: 'text-sky-500',
       valueColor: 'text-sky-600 dark:text-sky-400',
+      href: '/transactions?tab=IN',
     },
     {
       label: '出庫予定',
@@ -89,6 +92,7 @@ export function DashboardPage() {
       iconBg: 'bg-amber-50 dark:bg-amber-950',
       iconColor: 'text-amber-500',
       valueColor: 'text-amber-600 dark:text-amber-400',
+      href: '/transactions?tab=OUT',
     },
   ]
 
@@ -116,20 +120,22 @@ export function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        {statCards.map(({ label, value, icon: Icon, iconBg, iconColor, valueColor }) => (
-          <Card key={label} className="overflow-hidden border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-            <CardContent className="p-0">
-              <div className="flex items-center gap-3 p-4">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}>
-                  <Icon className={`h-5 w-5 ${iconColor}`} />
+        {statCards.map(({ label, value, icon: Icon, iconBg, iconColor, valueColor, href }) => (
+          <Link key={label} to={href} className="block">
+            <Card className="overflow-hidden border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <CardContent className="p-0">
+                <div className="flex items-center gap-3 p-4">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}>
+                    <Icon className={`h-5 w-5 ${iconColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground tracking-wide">{label}</p>
+                    <p className={`text-2xl font-bold tracking-tight num-display ${valueColor}`}>{value}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground tracking-wide">{label}</p>
-                  <p className={`text-2xl font-bold tracking-tight num-display ${valueColor}`}>{value}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
