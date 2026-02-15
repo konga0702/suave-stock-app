@@ -1,19 +1,34 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, X, Package, ArrowUpFromLine, BoxSelect, Tag, Download } from 'lucide-react'
+import { Search, X, Package, ArrowUpFromLine, BoxSelect, Tag, Download, CheckSquare, Square, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { supabase } from '@/lib/supabase'
 import { exportInventoryCsv } from '@/lib/csv'
+import { toast } from 'sonner'
 import type { InventoryItem } from '@/types/database'
 
 export function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('IN_STOCK')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     let query = supabase
@@ -38,6 +53,12 @@ export function InventoryPage() {
     load()
   }, [load])
 
+  // タブ変更時に選択モードをリセット
+  useEffect(() => {
+    setSelectMode(false)
+    setSelected(new Set())
+  }, [tab])
+
   const filtered = items.filter((item) => {
     if (!search) return true
     const q = search.toLowerCase()
@@ -50,6 +71,50 @@ export function InventoryPage() {
       item.memo?.toLowerCase().includes(q)
     )
   })
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map((i) => i.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    setDeleting(true)
+    try {
+      const ids = Array.from(selected)
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .in('id', ids)
+      if (error) throw error
+      toast.success(`${ids.length}件の個体データを削除しました`)
+      setSelected(new Set())
+      setSelectMode(false)
+      load()
+    } catch {
+      toast.error('削除に失敗しました')
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
 
   return (
     <div className="page-transition space-y-5">
@@ -65,17 +130,67 @@ export function InventoryPage() {
           }`}>
             {filtered.length}件
           </Badge>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
-            onClick={() => exportInventoryCsv(filtered)}
-            title="CSVエクスポート"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
+          {!selectMode ? (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={() => setSelectMode(true)}
+                title="選択モード"
+              >
+                <CheckSquare className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={() => exportInventoryCsv(filtered)}
+                title="CSVエクスポート"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl text-xs"
+              onClick={exitSelectMode}
+            >
+              キャンセル
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* 選択モード: 全選択・削除バー */}
+      {selectMode && (
+        <div className="flex items-center justify-between rounded-2xl bg-slate-100 dark:bg-slate-800 p-3">
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="flex items-center gap-2 text-sm font-medium"
+          >
+            {selected.size === filtered.length && filtered.length > 0 ? (
+              <CheckSquare className="h-4 w-4 text-violet-500" />
+            ) : (
+              <Square className="h-4 w-4 text-muted-foreground" />
+            )}
+            全選択 ({selected.size}/{filtered.length})
+          </button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="rounded-xl text-xs gap-1.5"
+            disabled={selected.size === 0}
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="h-3 w-3" />
+            {selected.size}件を削除
+          </Button>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -129,11 +244,25 @@ export function InventoryPage() {
             </div>
           ) : (
             filtered.map((item, index) => (
-              <Card key={item.id} className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md ${
-                index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-              }`}>
+              <Card
+                key={item.id}
+                className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md ${
+                  index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
+                } ${selectMode && selected.has(item.id) ? 'ring-2 ring-violet-400 dark:ring-violet-500' : ''}`}
+                onClick={selectMode ? () => toggleSelect(item.id) : undefined}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3.5">
+                    {/* 選択モード: チェックボックス */}
+                    {selectMode && (
+                      <div className="mt-1 shrink-0">
+                        {selected.has(item.id) ? (
+                          <CheckSquare className="h-5 w-5 text-violet-500" />
+                        ) : (
+                          <Square className="h-5 w-5 text-muted-foreground/40" />
+                        )}
+                      </div>
+                    )}
                     {item.product?.image_url ? (
                       <div className={`mt-0.5 h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
                         item.status === 'IN_STOCK' ? 'border-violet-200 dark:border-violet-800' : 'border-slate-200 dark:border-slate-700'
@@ -186,6 +315,28 @@ export function InventoryPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* 削除確認ダイアログ */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>個体データを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              選択した{selected.size}件の個体追跡データを削除します。この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-rose-500 hover:bg-rose-600 rounded-xl"
+              disabled={deleting}
+            >
+              {deleting ? '削除中...' : `${selected.size}件を削除`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
