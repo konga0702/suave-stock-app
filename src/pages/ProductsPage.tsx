@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Barcode, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter } from 'lucide-react'
+import { Plus, Search, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,8 +20,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { BarcodeScanButton } from '@/components/BarcodeScanButton'
-import { BarcodeDisplay } from '@/components/BarcodeDisplay'
 import { supabase } from '@/lib/supabase'
 import { exportProductsCsv, importProductsCsv } from '@/lib/csv'
 import { toast } from 'sonner'
@@ -50,7 +48,6 @@ const stockFilterOptions: { key: StockFilter; label: string }[] = [
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [search, setSearch] = useState('')
-  const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -322,7 +319,6 @@ export function ProductsPage() {
             <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-sky-500" />
           )}
         </Button>
-        <BarcodeScanButton onScan={(barcode) => setSearch(barcode)} />
       </div>
 
       {/* アクティブなフィルター表示 */}
@@ -379,84 +375,69 @@ export function ProductsPage() {
             </p>
           </div>
         ) : (
-          filteredAndSorted.map((product, index) => (
-            <Card
-              key={product.id}
-              className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-                index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-              } ${selectMode && selectedIds.has(product.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20' : ''}`}
-              onClick={selectMode ? () => toggleSelect(product.id) : undefined}
-            >
-              <CardContent className="flex items-center gap-3.5 p-4">
-                {selectMode && (
-                  <div className="shrink-0">
-                    {selectedIds.has(product.id) ? (
-                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500 text-white">
-                        <CheckSquare className="h-4 w-4" />
-                      </div>
-                    ) : (
-                      <div className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-border/60">
-                        <Square className="h-4 w-4 text-transparent" />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {product.image_url ? (
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
-                    <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
-                    <Package className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  {selectMode ? (
-                    <p className="text-[13px] font-semibold truncate">{product.name}</p>
-                  ) : (
-                    <Link
-                      to={`/products/${product.id}/edit`}
-                      className="block text-[13px] font-semibold hover:text-slate-600 dark:hover:text-slate-300 truncate transition-colors"
-                    >
-                      {product.name}
-                    </Link>
+          filteredAndSorted.map((product, index) => {
+            const cardContent = (
+              <Card
+                className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
+                  index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
+                } ${selectMode && selectedIds.has(product.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20' : ''}`}
+                onClick={selectMode ? () => toggleSelect(product.id) : undefined}
+              >
+                <CardContent className="flex items-center gap-3.5 p-4">
+                  {selectMode && (
+                    <div className="shrink-0">
+                      {selectedIds.has(product.id) ? (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500 text-white">
+                          <CheckSquare className="h-4 w-4" />
+                        </div>
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-border/60">
+                          <Square className="h-4 w-4 text-transparent" />
+                        </div>
+                      )}
+                    </div>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                    {product.product_code && (
-                      <span className="font-mono text-[11px] text-muted-foreground/70">{product.product_code}</span>
-                    )}
-                    {product.internal_barcode && (
-                      <span className="font-mono text-[11px] text-muted-foreground/70">{product.internal_barcode}</span>
-                    )}
+                  {product.image_url ? (
+                    <div className="h-11 w-11 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+                      <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
+                      <Package className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold truncate">{product.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                      {product.product_code && (
+                        <span className="font-mono text-[11px] text-muted-foreground/70">{product.product_code}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                      <span className="text-rose-500 dark:text-rose-400 font-semibold num-display">仕¥{Number(product.cost_price ?? product.default_unit_price ?? 0).toLocaleString()}</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold num-display">売¥{Number(product.selling_price ?? 0).toLocaleString()}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                    <span className="text-rose-500 dark:text-rose-400 font-semibold num-display">仕¥{Number(product.cost_price ?? product.default_unit_price ?? 0).toLocaleString()}</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold num-display">売¥{Number(product.selling_price ?? 0).toLocaleString()}</span>
-                  </div>
-                </div>
-                {!selectMode && (
-                  <div className="flex items-center gap-2">
+                  {!selectMode && (
                     <div className={`rounded-xl px-3 py-1.5 text-center ${getStockColor(product.current_stock)}`}>
                       <div className="text-base font-bold leading-tight num-display">
                         {product.current_stock}
                       </div>
                       <div className="text-[9px] font-medium leading-tight opacity-70">在庫</div>
                     </div>
-                    {product.internal_barcode && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground/50 hover:text-slate-600 transition-colors"
-                        onClick={() => setBarcodeProduct(product)}
-                      >
-                        <Barcode className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                  )}
+                </CardContent>
+              </Card>
+            )
+
+            return selectMode ? (
+              <div key={product.id}>{cardContent}</div>
+            ) : (
+              <Link key={product.id} to={`/products/${product.id}/edit`}>
+                {cardContent}
+              </Link>
+            )
+          })
         )}
       </div>
 
@@ -608,20 +589,6 @@ export function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* バーコード表示ダイアログ */}
-      <Dialog open={!!barcodeProduct} onOpenChange={() => setBarcodeProduct(null)}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{barcodeProduct?.name}</DialogTitle>
-          </DialogHeader>
-          {barcodeProduct?.internal_barcode && (
-            <BarcodeDisplay
-              value={barcodeProduct.internal_barcode}
-              label="管理バーコード"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

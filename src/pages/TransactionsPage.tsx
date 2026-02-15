@@ -30,6 +30,7 @@ import type { Transaction } from '@/types/database'
 interface TxWithProducts extends Transaction {
   firstProductImage?: string | null
   firstProductName?: string | null
+  firstProductCode?: string | null
   itemCount?: number
 }
 
@@ -86,25 +87,25 @@ export function TransactionsPage() {
 
     // Step 3: products取得
     const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
-    const productsMap = new Map<string, { name: string; image_url: string | null }>()
+    const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
 
     if (productIds.length > 0) {
       const { data: productsData, error: prodError } = await supabase
         .from('products')
-        .select('id, name, image_url')
+        .select('id, name, image_url, product_code')
         .in('id', productIds)
 
       if (prodError) console.error('products error:', prodError)
 
       if (productsData) {
         for (const p of productsData) {
-          productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null })
+          productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
         }
       }
     }
 
     // Step 4: マッピング
-    const txProductMap = new Map<string, { image_url: string | null; name: string; count: number }>()
+    const txProductMap = new Map<string, { image_url: string | null; name: string; product_code: string | null; count: number }>()
     if (itemsData) {
       for (const item of itemsData) {
         const existing = txProductMap.get(item.transaction_id)
@@ -113,6 +114,7 @@ export function TransactionsPage() {
           txProductMap.set(item.transaction_id, {
             image_url: product?.image_url ?? null,
             name: product?.name ?? '',
+            product_code: product?.product_code ?? null,
             count: 1,
           })
         } else {
@@ -128,6 +130,7 @@ export function TransactionsPage() {
           ...tx,
           firstProductImage: productInfo?.image_url ?? null,
           firstProductName: productInfo?.name ?? null,
+          firstProductCode: productInfo?.product_code ?? null,
           itemCount: productInfo?.count ?? 0,
         }
       })
@@ -543,6 +546,9 @@ export function TransactionsPage() {
                           {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
                         </p>
                       )}
+                      {tx.firstProductCode && (
+                        <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.firstProductCode}</p>
+                      )}
                       <div className="flex items-center gap-1.5 mt-1">
                         <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
                           isIN
@@ -601,6 +607,9 @@ export function TransactionsPage() {
                           <p className="text-[13px] font-bold truncate">
                             {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
                           </p>
+                        )}
+                        {tx.firstProductCode && (
+                          <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.firstProductCode}</p>
                         )}
                         <div className="flex items-center gap-1.5 mt-1">
                           <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${

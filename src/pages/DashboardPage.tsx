@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Package, ArrowDownToLine, ArrowUpFromLine, AlertTriangle,
+  Package, ArrowDownToLine, ArrowUpFromLine,
   BarChart3,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 
 interface Stats {
   totalProducts: number
-  lowStockCount: number
+  netStock: number
   scheduledIn: number
   scheduledOut: number
 }
@@ -18,22 +18,38 @@ interface Stats {
 export function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
     totalProducts: 0,
-    lowStockCount: 0,
+    netStock: 0,
     scheduledIn: 0,
     scheduledOut: 0,
   })
 
   useEffect(() => {
     async function loadStats() {
-      const [productsRes, lowStockRes, scheduledInRes, scheduledOutRes] = await Promise.all([
+      const [productsRes, scheduledInRes, scheduledOutRes] = await Promise.all([
         supabase.from('products').select('id', { count: 'exact', head: true }),
-        supabase.from('products').select('id', { count: 'exact', head: true }).lte('current_stock', 5),
         supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'IN').eq('status', 'SCHEDULED'),
         supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'OUT').eq('status', 'SCHEDULED'),
       ])
+
+      // 純在庫数を計算: 入荷商品数 - 出荷商品数（COMPLETED取引の明細から集計）
+      const { data: inItems } = await supabase
+        .from('transaction_items')
+        .select('quantity, transaction:transactions!inner(type, status)')
+        .eq('transaction.type' as string, 'IN')
+        .eq('transaction.status' as string, 'COMPLETED')
+
+      const { data: outItems } = await supabase
+        .from('transaction_items')
+        .select('quantity, transaction:transactions!inner(type, status)')
+        .eq('transaction.type' as string, 'OUT')
+        .eq('transaction.status' as string, 'COMPLETED')
+
+      const totalIn = (inItems ?? []).reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+      const totalOut = (outItems ?? []).reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+
       setStats({
         totalProducts: productsRes.count ?? 0,
-        lowStockCount: lowStockRes.count ?? 0,
+        netStock: totalIn - totalOut,
         scheduledIn: scheduledInRes.count ?? 0,
         scheduledOut: scheduledOutRes.count ?? 0,
       })
@@ -51,12 +67,12 @@ export function DashboardPage() {
       valueColor: '',
     },
     {
-      label: '在庫少',
-      value: stats.lowStockCount,
-      icon: AlertTriangle,
-      iconBg: 'bg-rose-50 dark:bg-rose-950',
-      iconColor: 'text-rose-500',
-      valueColor: stats.lowStockCount > 0 ? 'text-rose-500' : '',
+      label: '純在庫数',
+      value: stats.netStock,
+      icon: Package,
+      iconBg: 'bg-emerald-50 dark:bg-emerald-950',
+      iconColor: 'text-emerald-500',
+      valueColor: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       label: '入庫予定',
