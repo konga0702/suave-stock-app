@@ -380,6 +380,9 @@ export function TransactionDetailPage() {
                 )}
                 <div>
                   <p className="text-[13px] font-semibold">{item.product?.name ?? '不明な商品'}</p>
+                  {item.product?.product_code && (
+                    <p className="font-mono text-[11px] text-muted-foreground/70">{item.product.product_code}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {item.quantity} × ¥{Number(item.price).toLocaleString()}
                     <span className={`ml-1.5 opacity-60`}>({priceLabel})</span>

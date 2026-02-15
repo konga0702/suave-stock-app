@@ -209,6 +209,7 @@ export function TransactionsPage() {
         tx.memo?.toLowerCase().includes(q) ||
         tx.category?.toLowerCase().includes(q) ||
         tx.firstProductName?.toLowerCase().includes(q) ||
+        tx.firstProductCode?.toLowerCase().includes(q) ||
         (tx.type === 'IN' ? '入庫' : '出庫').includes(q)
       )
     }
