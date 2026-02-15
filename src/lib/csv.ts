@@ -476,9 +476,15 @@ export async function importTransactionsCsv(text: string) {
     txCount++
   }
 
+  if (notFound.length > 0 && txCount === 0) {
+    throw new Error(
+      `インポートに失敗しました。\nCSVの商品名が商品マスタに登録されていません。\n\n見つからない商品名:\n${notFound.join('\n')}\n\n※商品名は商品一覧に登録済みの名前と完全一致させてください。商品コードでもマッチできます。`
+    )
+  }
+
   if (notFound.length > 0) {
     throw new Error(
-      `${txCount}件の取引を登録しました。\n以下の商品名が見つかりませんでした:\n${notFound.join(', ')}`
+      `${txCount}件の取引を登録しました。\n以下の商品名が見つからずスキップしました:\n${notFound.join(', ')}`
     )
   }
 
@@ -507,5 +513,69 @@ export function exportInventoryCsv(items: InventoryItem[]) {
   downloadCsv(
     `stock_report_${todayStr()}.csv`,
     [header, ...rows].join('\n')
+  )
+}
+
+// ---- 入出庫CSVテンプレート（登録済み商品名で動的生成） ----
+
+export async function downloadTransactionsTemplate() {
+  const { data: products } = await supabase
+    .from('products')
+    .select('name, cost_price, selling_price, default_unit_price')
+    .order('name')
+    .limit(5)
+
+  const header = '日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,メモ'
+  const today = new Date().toISOString().split('T')[0]
+
+  let sampleRows: string[]
+  if (products && products.length > 0) {
+    // 登録済み商品名を使ったサンプルデータ
+    sampleRows = products.slice(0, 3).map((p, i) => {
+      const price = Number(p.cost_price ?? p.default_unit_price ?? 0)
+      return [
+        today,
+        '入庫',
+        '入荷',
+        esc(p.name),
+        String(i + 1),
+        String(price),
+        '仕入先サンプル',
+        `TRK-00${i + 1}`,
+        `ORD-00${i + 1}`,
+        `SHP-00${i + 1}`,
+        'サンプルデータ',
+      ].join(',')
+    })
+    // 出庫サンプルも1件追加
+    if (products.length > 0) {
+      const p = products[0]
+      const sellPrice = Number(p.selling_price ?? p.default_unit_price ?? 0)
+      sampleRows.push(
+        [
+          today,
+          '出庫',
+          '出荷',
+          esc(p.name),
+          '1',
+          String(sellPrice),
+          '顧客サンプル',
+          'TRK-010',
+          'ORD-010',
+          'SHP-010',
+          '出荷サンプル',
+        ].join(',')
+      )
+    }
+  } else {
+    // 商品未登録の場合はガイド行
+    sampleRows = [
+      `${today},入庫,入荷,※ここに登録済みの商品名を入力,1,1000,仕入先名,TRK-001,ORD-001,SHP-001,メモ`,
+    ]
+  }
+
+  downloadCsv(
+    `transactions_template_${todayStr()}.csv`,
+    [header, ...sampleRows].join('\n')
   )
 }

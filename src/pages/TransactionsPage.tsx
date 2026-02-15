@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
-import { exportTransactionsCsv, importTransactionsCsv } from '@/lib/csv'
+import { exportTransactionsCsv, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
 import { toast } from 'sonner'
 import type { Transaction } from '@/types/database'
 
@@ -314,11 +314,9 @@ export function TransactionsPage() {
         <div className="flex gap-1.5">
           {!selectMode ? (
             <>
-              <a href="/transactions_template.csv" download className="inline-flex">
-                <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" title="CSVテンプレート">
-                  <FileDown className="h-4 w-4" />
-                </Button>
-              </a>
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => downloadTransactionsTemplate()} title="CSVテンプレート">
+                <FileDown className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
                 <Upload className="h-4 w-4" />
               </Button>
