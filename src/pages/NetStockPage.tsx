@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Package, ArrowDownToLine, ArrowUpFromLine, Search, X,
+  ArrowUpDown, Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,11 +19,36 @@ interface NetStockRow {
   netStock: number
 }
 
+type SortKey = 'name_asc' | 'name_desc' | 'net_desc' | 'net_asc' | 'in_desc' | 'out_desc'
+type StockFilter = 'all' | 'positive' | 'negative' | 'zero' | 'has_in' | 'has_out'
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'name_asc', label: '商品名 A→Z' },
+  { key: 'name_desc', label: '商品名 Z→A' },
+  { key: 'net_desc', label: '純在庫 多い順' },
+  { key: 'net_asc', label: '純在庫 少ない順' },
+  { key: 'in_desc', label: '入庫数 多い順' },
+  { key: 'out_desc', label: '出庫数 多い順' },
+]
+
+const FILTER_OPTIONS: { key: StockFilter; label: string; color: string }[] = [
+  { key: 'all', label: 'すべて', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+  { key: 'positive', label: 'プラス在庫', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' },
+  { key: 'negative', label: 'マイナス在庫', color: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400' },
+  { key: 'zero', label: 'ゼロ在庫', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+  { key: 'has_in', label: '入庫あり', color: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400' },
+  { key: 'has_out', label: '出庫あり', color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400' },
+]
+
 export function NetStockPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<NetStockRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('name_asc')
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all')
+  const [showSort, setShowSort] = useState(false)
+  const [showFilter, setShowFilter] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -82,18 +108,65 @@ export function NetStockPage() {
     load()
   }, [])
 
-  const filteredRows = rows.filter((r) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      r.product_name.toLowerCase().includes(q) ||
-      r.product_code.toLowerCase().includes(q)
-    )
-  })
+  const processedRows = useMemo(() => {
+    // 1) テキスト検索
+    let result = rows.filter((r) => {
+      if (!search) return true
+      const q = search.toLowerCase()
+      return (
+        r.product_name.toLowerCase().includes(q) ||
+        r.product_code.toLowerCase().includes(q)
+      )
+    })
 
-  const totalNetStock = filteredRows.reduce((sum, r) => sum + r.netStock, 0)
-  const totalIn = filteredRows.reduce((sum, r) => sum + r.totalIn, 0)
-  const totalOut = filteredRows.reduce((sum, r) => sum + r.totalOut, 0)
+    // 2) 絞り込みフィルター
+    switch (stockFilter) {
+      case 'positive':
+        result = result.filter((r) => r.netStock > 0)
+        break
+      case 'negative':
+        result = result.filter((r) => r.netStock < 0)
+        break
+      case 'zero':
+        result = result.filter((r) => r.netStock === 0)
+        break
+      case 'has_in':
+        result = result.filter((r) => r.totalIn > 0)
+        break
+      case 'has_out':
+        result = result.filter((r) => r.totalOut > 0)
+        break
+    }
+
+    // 3) ソート
+    result = [...result].sort((a, b) => {
+      switch (sortKey) {
+        case 'name_asc':
+          return a.product_name.localeCompare(b.product_name, 'ja')
+        case 'name_desc':
+          return b.product_name.localeCompare(a.product_name, 'ja')
+        case 'net_desc':
+          return b.netStock - a.netStock
+        case 'net_asc':
+          return a.netStock - b.netStock
+        case 'in_desc':
+          return b.totalIn - a.totalIn
+        case 'out_desc':
+          return b.totalOut - a.totalOut
+        default:
+          return 0
+      }
+    })
+
+    return result
+  }, [rows, search, stockFilter, sortKey])
+
+  const totalNetStock = processedRows.reduce((sum, r) => sum + r.netStock, 0)
+  const totalIn = processedRows.reduce((sum, r) => sum + r.totalIn, 0)
+  const totalOut = processedRows.reduce((sum, r) => sum + r.totalOut, 0)
+
+  const activeSortLabel = SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? ''
+  const activeFilterLabel = FILTER_OPTIONS.find((o) => o.key === stockFilter)
 
   return (
     <div className="page-transition space-y-4">
@@ -159,22 +232,108 @@ export function NetStockPage() {
         )}
       </div>
 
+      {/* ソート・フィルターボタン */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`rounded-xl text-xs gap-1.5 ${showSort ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
+          onClick={() => { setShowSort(!showSort); setShowFilter(false) }}
+        >
+          <ArrowUpDown className="h-3 w-3" />
+          並び替え
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`rounded-xl text-xs gap-1.5 ${showFilter || stockFilter !== 'all' ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
+          onClick={() => { setShowFilter(!showFilter); setShowSort(false) }}
+        >
+          <Filter className="h-3 w-3" />
+          絞り込み
+        </Button>
+      </div>
+
+      {/* ソートパネル */}
+      {showSort && (
+        <div className="flex flex-wrap gap-1.5">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => { setSortKey(opt.key); setShowSort(false) }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
+                sortKey === opt.key
+                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* フィルターパネル */}
+      {showFilter && (
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => { setStockFilter(opt.key); setShowFilter(false) }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
+                stockFilter === opt.key
+                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                  : opt.color
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* アクティブなフィルター・ソートタグ */}
+      {(sortKey !== 'name_asc' || stockFilter !== 'all') && (
+        <div className="flex flex-wrap gap-1.5">
+          {sortKey !== 'name_asc' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              <ArrowUpDown className="h-2.5 w-2.5" />
+              {activeSortLabel}
+              <button type="button" onClick={() => setSortKey('name_asc')} className="ml-0.5 hover:text-foreground">
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          )}
+          {stockFilter !== 'all' && activeFilterLabel && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${activeFilterLabel.color}`}>
+              <Filter className="h-2.5 w-2.5" />
+              {activeFilterLabel.label}
+              <button type="button" onClick={() => setStockFilter('all')} className="ml-0.5 hover:text-foreground">
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* 件数 */}
-      <p className="text-xs text-muted-foreground">{filteredRows.length}件の商品</p>
+      <p className="text-xs text-muted-foreground">{processedRows.length}件の商品</p>
 
       {/* 一覧 */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
         </div>
-      ) : filteredRows.length === 0 ? (
+      ) : processedRows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <Package className="h-8 w-8 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">該当する商品がありません</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredRows.map((row) => (
+          {processedRows.map((row) => (
             <Card
               key={row.product_id}
               className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md cursor-pointer"
