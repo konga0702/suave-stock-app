@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter } from 'lucide-react'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, CalendarCheck, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -62,6 +62,11 @@ export function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // 一括完了機能
+  const [dateCutoff, setDateCutoff] = useState('2026-02-16')
+  const [completing, setCompleting] = useState(false)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
 
   const load = useCallback(async () => {
     // Step 1: transactions取得
@@ -277,6 +282,53 @@ export function TransactionsPage() {
     }
   }
 
+  // 日付指定で自動選択
+  const selectByDate = () => {
+    if (!dateCutoff) return
+    const cutoffDate = new Date(dateCutoff)
+    const selected = new Set<string>()
+
+    filteredAndSorted.forEach((tx) => {
+      const txDate = new Date(tx.date)
+      if (txDate <= cutoffDate) {
+        selected.add(tx.id)
+      }
+    })
+
+    setSelectedIds(selected)
+    toast.info(`${selected.size}件を選択しました`)
+  }
+
+  // 一括完了
+  const handleBulkComplete = async () => {
+    setCompleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+
+      // statusのみをCOMPLETEDに更新（在庫への影響なし）
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          status: 'COMPLETED',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', ids)
+        .eq('status', 'SCHEDULED') // 念のため予定のみ対象
+
+      if (error) throw error
+
+      toast.success(`${ids.length}件の予定を履歴に移動しました`)
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      setShowCompleteConfirm(false)
+      load()
+    } catch {
+      toast.error('完了処理に失敗しました')
+    } finally {
+      setCompleting(false)
+    }
+  }
+
   // 一括削除
   const handleBulkDelete = async () => {
     setDeleting(true)
@@ -456,6 +508,29 @@ export function TransactionsPage() {
             すべてクリア
           </button>
         </div>
+      )}
+
+      {/* 選択モード時の日付選択UI（予定タブのみ） */}
+      {selectMode && tab === 'SCHEDULED' && (
+        <Card className="border-2 border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/20 shadow-sm">
+          <CardContent className="flex items-center gap-2 p-3">
+            <CalendarCheck className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <Input
+              type="date"
+              value={dateCutoff}
+              onChange={(e) => setDateCutoff(e.target.value)}
+              className="flex-1 h-9 rounded-lg border-sky-300 dark:border-sky-700 bg-white dark:bg-slate-900 text-sm"
+            />
+            <span className="text-xs text-sky-700 dark:text-sky-300 font-medium shrink-0">以前を</span>
+            <Button
+              onClick={selectByDate}
+              size="sm"
+              className="h-9 rounded-lg bg-sky-500 hover:bg-sky-600 text-white shadow-sm text-xs font-semibold px-4"
+            >
+              選択
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* 件数表示 */}
@@ -645,20 +720,32 @@ export function TransactionsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* 選択モード時のフローティング削除バー */}
+      {/* 選択モード時のフローティングアクションバー */}
       {selectMode && selectedIds.size > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-50 animate-fade-in">
           <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-800 dark:bg-slate-200 p-4 shadow-xl shadow-slate-900/30">
             <p className="text-sm font-semibold text-white dark:text-slate-900">
               {selectedIds.size}件選択中
             </p>
-            <Button
-              className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all text-xs font-semibold"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              まとめて削除
-            </Button>
+            <div className="flex gap-2">
+              {tab === 'SCHEDULED' && (
+                <Button
+                  className="rounded-xl bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-sky-500/25 transition-all text-xs font-semibold"
+                  onClick={() => setShowCompleteConfirm(true)}
+                  disabled={completing}
+                >
+                  <CheckCircle className="mr-1.5 h-4 w-4" />
+                  {completing ? '処理中...' : 'まとめて完了'}
+                </Button>
+              )}
+              <Button
+                className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all text-xs font-semibold"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                まとめて削除
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -680,6 +767,29 @@ export function TransactionsPage() {
               disabled={deleting}
             >
               {deleting ? '削除中...' : `${selectedIds.size}件を削除`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 一括完了確認ダイアログ */}
+      <AlertDialog open={showCompleteConfirm} onOpenChange={setShowCompleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{selectedIds.size}件の予定を履歴に移動しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作により、選択した{selectedIds.size}件の予定のステータスが「完了」に変更され、履歴タブに移動します。
+              在庫数への影響はありません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={completing}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkComplete}
+              className="bg-sky-500 hover:bg-sky-600 rounded-xl"
+              disabled={completing}
+            >
+              {completing ? '処理中...' : `${selectedIds.size}件を完了`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
