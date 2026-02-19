@@ -349,15 +349,15 @@ export async function importTransactionsCsv(text: string) {
   if (rows.length < 2) throw new Error('CSVにデータがありません')
 
   const header = rows[0]
-  const dataRows = rows.slice(1).filter((r) => r.length >= 4 && r.some((c) => c))
 
-  if (dataRows.length === 0) throw new Error('インポートするデータがありません')
-
-  // 新フォーマット判定: 1列目が「日付」
+  // ── フォーマット判定 ──────────────────────────────────────────
+  // 新フォーマット: 1列目=「日付」、2列目=「区分」or「タイプ」
   const isNewFormat = header[0] === '日付' && (header[1] === '区分' || header[1] === 'タイプ')
 
   if (!isNewFormat) {
-    // 旧フォーマット (type,status,category,date,...) — 後方互換
+    // 旧フォーマット (type,status,category,date,...) — 後方互換・列位置固定
+    const dataRows = rows.slice(1).filter((r) => r.some((c) => c))
+    if (dataRows.length === 0) throw new Error('インポートするデータがありません')
     const inserts = dataRows.map((r) => ({
       type: r[0] as 'IN' | 'OUT',
       status: (r[1] || 'SCHEDULED') as 'SCHEDULED' | 'COMPLETED',
@@ -375,25 +375,54 @@ export async function importTransactionsCsv(text: string) {
     return inserts.length
   }
 
-  // --- 新フォーマット処理 ---
+  // ── 新フォーマット処理（ヘッダ名でカラムマッピング） ──────────────
 
-  // 商品テーブルを取得（名前 → id マッピング）
+  // ヘッダ名 → 列インデックスのマップを構築
+  // 同名ヘッダが複数ある場合は最初の出現を使う
+  const col = new Map<string, number>()
+  header.forEach((h, i) => {
+    const name = h.trim()
+    if (name && !col.has(name)) col.set(name, i)
+  })
+
+  // 列インデックスを安全に取得するヘルパー（列が存在しない場合は undefined）
+  const get = (r: string[], colName: string): string =>
+    col.has(colName) ? (r[col.get(colName)!] ?? '').trim() : ''
+
+  // データ行: 日付・商品名がどちらも空の行はスキップ
+  const rawDataRows = rows.slice(1)
+  interface IndexedRow { r: string[]; csvLine: number }
+  const dataRows: IndexedRow[] = rawDataRows
+    .map((r, i) => ({ r, csvLine: i + 2 })) // csvLine は 1-origin でヘッダが1行目
+    .filter(({ r }) => r.some((c) => c.trim()))  // 完全空行を除外
+
+  if (dataRows.length === 0) throw new Error('インポートするデータがありません')
+
+  // 商品マスタを取得（商品コード優先、次いで商品名）
   const { data: products } = await supabase.from('products').select('id, name, product_code')
-  const productMap = new Map<string, string>() // name(lower) → id
-  const codeMap = new Map<string, string>()    // product_code(lower) → id
+  const productNameMap = new Map<string, string>() // name.toLowerCase() → id
+  const productCodeMap = new Map<string, string>() // product_code.toLowerCase() → id
   if (products) {
     for (const p of products) {
-      productMap.set(p.name.toLowerCase(), p.id)
-      if (p.product_code) codeMap.set(p.product_code.toLowerCase(), p.id)
+      productNameMap.set(p.name.trim().toLowerCase(), p.id)
+      if (p.product_code) productCodeMap.set(p.product_code.trim().toLowerCase(), p.id)
     }
   }
 
   // 区分テキスト → type 変換
   function parseType(val: string): 'IN' | 'OUT' {
     const v = val.trim()
-    if (v === '入庫' || v === 'IN') return 'IN'
-    if (v === '出庫' || v === 'OUT') return 'OUT'
-    return 'IN'
+    if (v === '入庫' || v === 'IN'  || v === '入荷') return 'IN'
+    if (v === '出庫' || v === 'OUT' || v === '出荷') return 'OUT'
+    return 'IN' // デフォルト: 入庫
+  }
+
+  // ステータステキスト → status 変換
+  function parseStatus(val: string): 'SCHEDULED' | 'COMPLETED' {
+    const v = val.trim()
+    if (v === '履歴' || v === 'COMPLETED' || v === '完了') return 'COMPLETED'
+    // 「予定」「SCHEDULED」「」→ SCHEDULED
+    return 'SCHEDULED'
   }
 
   // カテゴリのデフォルト
@@ -401,12 +430,15 @@ export async function importTransactionsCsv(text: string) {
     return type === 'IN' ? '入荷' : '出荷'
   }
 
-  // 行をパース
+  // ── 行をパース（日付が空 = 前の取引の追加明細） ──────────────────
   interface ParsedRow {
+    csvLine: number
     date: string
     type: 'IN' | 'OUT'
+    status: 'SCHEDULED' | 'COMPLETED'
     category: string
     productName: string
+    productCode: string       // 商品コード列があれば使う
     quantity: number
     price: number
     partnerName: string | null
@@ -416,117 +448,145 @@ export async function importTransactionsCsv(text: string) {
     memo: string | null
   }
 
-  // 連続行の結合（日付が空欄 = 前の行の取引に属する明細）
   const parsedRows: ParsedRow[] = []
-  let lastBase: Omit<ParsedRow, 'productName' | 'quantity' | 'price'> | null = null
+  let lastBase: Omit<ParsedRow, 'csvLine' | 'productName' | 'productCode' | 'quantity' | 'price'> | null = null
 
-  for (const r of dataRows) {
-    const date = r[0]?.trim()
-    const typeStr = r[1]?.trim()
-    const cat = r[2]?.trim()
+  for (const { r, csvLine } of dataRows) {
+    const date = get(r, '日付')
 
     if (date) {
       // 新しい取引の開始行
-      const type = parseType(typeStr)
+      const typeStr  = get(r, '区分') || get(r, 'タイプ')
+      const statusStr = get(r, 'ステータス')
+      const cat      = get(r, 'カテゴリ')
+      const type     = parseType(typeStr)
+
       lastBase = {
         date,
         type,
-        category: cat || defaultCategory(type),
-        partnerName: r[6]?.trim() || null,
-        trackingNumber: r[7]?.trim() || null,
-        orderCode: r[8]?.trim() || null,
-        shippingCode: r[9]?.trim() || null,
-        memo: r[10]?.trim() || null,
+        status:        parseStatus(statusStr),
+        category:      cat || defaultCategory(type),
+        partnerName:   get(r, '取引先')   || null,
+        trackingNumber: get(r, '管理番号') || null,
+        orderCode:     get(r, '注文コード') || null,
+        shippingCode:  get(r, '追跡コード') || null,
+        memo:          get(r, 'メモ')      || null,
       }
     }
 
-    if (!lastBase) continue
+    if (!lastBase) continue  // 日付より前に明細行が来た場合は無視
 
-    const productName = r[3]?.trim()
-    if (!productName) continue
+    const productName = get(r, '商品名')
+    const productCode = get(r, '商品コード') || get(r, 'product_code') || ''
+
+    // 日付も商品名もない行はスキップ
+    if (!date && !productName) continue
+
+    // 商品名がない行もスキップ（取引ヘッダ行で明細なしの場合）
+    if (!productName && !productCode) continue
 
     parsedRows.push({
+      csvLine,
       ...lastBase,
-      // 日付行でない場合でも基本情報は lastBase から引き継ぐ
       productName,
-      quantity: parseNum(r[4]),
-      price: parseNum(r[5]),
+      productCode,
+      quantity: parseNum(get(r, '数量')),
+      price:    parseNum(get(r, '単価')),
     })
   }
 
   if (parsedRows.length === 0) throw new Error('インポートするデータがありません')
 
-  // 取引ごとにグループ化（日付+区分+管理番号+注文コード でグルーピング）
+  // ── グループ化（日付+区分+ステータス+管理番号+注文コード） ──────────
   interface TxGroup {
     date: string
     type: 'IN' | 'OUT'
+    status: 'SCHEDULED' | 'COMPLETED'
     category: string
     partnerName: string | null
     trackingNumber: string | null
     orderCode: string | null
     shippingCode: string | null
     memo: string | null
-    items: Array<{ productName: string; quantity: number; price: number }>
+    items: Array<{ csvLine: number; productName: string; productCode: string; quantity: number; price: number }>
   }
 
   const groups: TxGroup[] = []
   let currentGroup: TxGroup | null = null
 
   for (const row of parsedRows) {
-    const groupKey = `${row.date}|${row.type}|${row.trackingNumber ?? ''}|${row.orderCode ?? ''}`
-    const prevKey = currentGroup
-      ? `${currentGroup.date}|${currentGroup.type}|${currentGroup.trackingNumber ?? ''}|${currentGroup.orderCode ?? ''}`
+    const groupKey = `${row.date}|${row.type}|${row.status}|${row.trackingNumber ?? ''}|${row.orderCode ?? ''}`
+    const prevKey  = currentGroup
+      ? `${currentGroup.date}|${currentGroup.type}|${currentGroup.status}|${currentGroup.trackingNumber ?? ''}|${currentGroup.orderCode ?? ''}`
       : ''
 
     if (currentGroup && groupKey === prevKey) {
-      // 同じ取引に明細追加
       currentGroup.items.push({
+        csvLine:     row.csvLine,
         productName: row.productName,
-        quantity: row.quantity,
-        price: row.price,
+        productCode: row.productCode,
+        quantity:    row.quantity,
+        price:       row.price,
       })
     } else {
-      // 新しい取引グループ
       currentGroup = {
-        date: row.date,
-        type: row.type,
-        category: row.category,
-        partnerName: row.partnerName,
+        date:           row.date,
+        type:           row.type,
+        status:         row.status,
+        category:       row.category,
+        partnerName:    row.partnerName,
         trackingNumber: row.trackingNumber,
-        orderCode: row.orderCode,
-        shippingCode: row.shippingCode,
-        memo: row.memo,
+        orderCode:      row.orderCode,
+        shippingCode:   row.shippingCode,
+        memo:           row.memo,
         items: [{
+          csvLine:     row.csvLine,
           productName: row.productName,
-          quantity: row.quantity,
-          price: row.price,
+          productCode: row.productCode,
+          quantity:    row.quantity,
+          price:       row.price,
         }],
       }
       groups.push(currentGroup)
     }
   }
 
-  // 商品名が見つからない場合のエラー収集
-  const notFound: string[] = []
+  // ── 商品IDの解決 + エラー収集 ──────────────────────────────────
+  // notFound: { csvLine, name } で行番号付き報告
+  interface NotFoundEntry { csvLine: number; name: string }
+  const notFound: NotFoundEntry[] = []
+  const notFoundNames = new Set<string>() // 重複排除用
 
-  // 各グループをトランザクション + 明細として登録
   let txCount = 0
+
   for (const group of groups) {
-    // 明細の商品IDを解決
     const resolvedItems: Array<{ product_id: string; quantity: number; price: number }> = []
+
     for (const item of group.items) {
+      // 商品コード優先 → 商品名フォールバック
+      const searchCode = item.productCode.toLowerCase()
+      const searchName = item.productName.toLowerCase()
+
       const pid =
-        productMap.get(item.productName.toLowerCase()) ??
-        codeMap.get(item.productName.toLowerCase())
+        (searchCode ? productCodeMap.get(searchCode) : undefined) ??
+        productNameMap.get(searchName) ??
+        (searchCode ? productNameMap.get(searchCode) : undefined) // コードを名前として検索する最終フォールバック
 
       if (!pid) {
-        if (!notFound.includes(item.productName)) notFound.push(item.productName)
+        const label = item.productCode
+          ? `${item.productName}（コード: ${item.productCode}）`
+          : item.productName
+        if (!notFoundNames.has(label)) {
+          notFound.push({ csvLine: item.csvLine, name: label })
+          notFoundNames.add(label)
+        }
         continue
       }
+
       resolvedItems.push({
         product_id: pid,
-        quantity: item.quantity || 1,
-        price: item.price,
+        quantity:   item.quantity || 1,
+        price:      item.price,
       })
     }
 
@@ -538,16 +598,16 @@ export async function importTransactionsCsv(text: string) {
     const { data: newTx, error: txError } = await supabase
       .from('transactions')
       .insert({
-        type: group.type,
-        status: 'SCHEDULED' as const,
-        category: group.category,
-        date: group.date,
+        type:            group.type,
+        status:          group.status,   // ← ステータス列を反映（旧実装は常にSCHEDULED固定だった）
+        category:        group.category,
+        date:            group.date,
         tracking_number: group.trackingNumber,
-        order_code: group.orderCode,
-        shipping_code: group.shippingCode,
-        partner_name: group.partnerName,
-        total_amount: totalAmount,
-        memo: group.memo,
+        order_code:      group.orderCode,
+        shipping_code:   group.shippingCode,
+        partner_name:    group.partnerName,
+        total_amount:    totalAmount,
+        memo:            group.memo,
       })
       .select()
       .single()
@@ -560,9 +620,9 @@ export async function importTransactionsCsv(text: string) {
       .insert(
         resolvedItems.map((item) => ({
           transaction_id: newTx.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price: item.price,
+          product_id:     item.product_id,
+          quantity:       item.quantity,
+          price:          item.price,
         }))
       )
 
@@ -570,15 +630,18 @@ export async function importTransactionsCsv(text: string) {
     txCount++
   }
 
+  // ── エラー報告（行番号付き） ───────────────────────────────────
   if (notFound.length > 0 && txCount === 0) {
+    const lines = notFound.map((e) => `  ${e.csvLine}行目: ${e.name}`).join('\n')
     throw new Error(
-      `インポートに失敗しました。\nCSVの商品名が商品マスタに登録されていません。\n\n見つからない商品名:\n${notFound.join('\n')}\n\n※商品名は商品一覧に登録済みの名前と完全一致させてください。商品コードでもマッチできます。`
+      `インポートに失敗しました。CSVの商品名/商品コードが商品マスタに登録されていません。\n\n見つからない商品（行番号付き）:\n${lines}\n\n※商品名は商品一覧の名前と完全一致、または商品コード列を追加してください。`
     )
   }
 
   if (notFound.length > 0) {
+    const lines = notFound.map((e) => `${e.csvLine}行目: ${e.name}`).join('\n')
     throw new Error(
-      `${txCount}件の取引を登録しました。\n以下の商品名が見つからずスキップしました:\n${notFound.join(', ')}`
+      `${txCount}件の取引を登録しました。\n以下の商品が見つからずスキップしました:\n${lines}`
     )
   }
 
