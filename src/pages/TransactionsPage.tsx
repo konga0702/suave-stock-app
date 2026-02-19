@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
-import { exportTransactionsCsv, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
+import { exportTransactionsDetailCsvWithFilters, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
+import type { ExportProgress } from '@/lib/csv'
 import { toast } from 'sonner'
 import type { Transaction } from '@/types/database'
 
@@ -56,6 +57,10 @@ export function TransactionsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [partnerFilter, setPartnerFilter] = useState<string>('all')
   const [showSortFilter, setShowSortFilter] = useState(false)
+
+  // CSVエクスポート進捗
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
+  const exportAbortRef = useRef<AbortController | null>(null)
 
   // 選択モード
   const [selectMode, setSelectMode] = useState(false)
@@ -171,6 +176,44 @@ export function TransactionsPage() {
     }
     input.click()
   }
+
+  // CSVエクスポート（全件・フィルタ対応）
+  const handleExport = useCallback(async () => {
+    if (exportProgress) return  // 二重実行防止
+
+    const controller = new AbortController()
+    exportAbortRef.current = controller
+
+    try {
+      await exportTransactionsDetailCsvWithFilters(
+        {
+          status: tab,
+          type: typeFilter !== 'ALL' ? typeFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          partnerName: partnerFilter !== 'all' ? partnerFilter : undefined,
+          search: search || undefined,
+        },
+        (progress) => setExportProgress(progress),
+        controller.signal,
+      )
+      setExportProgress(null)
+      toast.success('CSVをエクスポートしました')
+    } catch (err: unknown) {
+      setExportProgress(null)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        toast.info('エクスポートをキャンセルしました')
+      } else {
+        const msg = err instanceof Error ? err.message : 'エクスポートに失敗しました'
+        toast.error(msg)
+      }
+    } finally {
+      exportAbortRef.current = null
+    }
+  }, [exportProgress, tab, typeFilter, categoryFilter, partnerFilter, search])
+
+  const handleExportCancel = useCallback(() => {
+    exportAbortRef.current?.abort()
+  }, [])
 
   // カテゴリ一覧
   const categories = useMemo(() => {
@@ -309,6 +352,19 @@ export function TransactionsPage() {
 
   return (
     <div className="page-transition space-y-5">
+      {/* CSVエクスポート進捗バナー */}
+      {exportProgress && exportProgress.phase !== 'done' && (
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-accent/50 px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">
+            {exportProgress.phase === 'counting' && '件数を確認中...'}
+            {exportProgress.phase === 'fetching' && `取得中 ${exportProgress.fetched} / ${exportProgress.total} 件`}
+            {exportProgress.phase === 'processing' && `CSV生成中 (${exportProgress.total} 件)`}
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleExportCancel}>
+            キャンセル
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">入出庫</h1>
         <div className="flex gap-1.5">
@@ -320,8 +376,18 @@ export function TransactionsPage() {
               <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
                 <Upload className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => exportTransactionsCsv(transactions)} title="CSVエクスポート">
-                <Download className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={handleExport}
+                disabled={!!exportProgress}
+                title="CSVエクスポート（全件）"
+              >
+                {exportProgress && exportProgress.phase !== 'done'
+                  ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  : <Download className="h-4 w-4" />
+                }
               </Button>
               <Button
                 variant="outline"
