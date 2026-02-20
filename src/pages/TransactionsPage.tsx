@@ -88,38 +88,56 @@ export function TransactionsPage() {
         return
       }
 
-      // Step 2: transaction_items取得（空配列チェック追加）
+      // Step 2: transaction_items取得（バッチ処理でSafari対応）
       const txIds = data.map((tx) => tx.id)
       let itemsData: { transaction_id: string; product_id: string }[] = []
 
       if (txIds.length > 0) {
-        const { data: items, error: itemsError } = await supabase
-          .from('transaction_items')
-          .select('transaction_id, product_id')
-          .in('transaction_id', txIds)
+        // Safari対策: 50件ずつバッチ処理
+        const BATCH_SIZE = 50
+        const batches = []
+        for (let i = 0; i < txIds.length; i += BATCH_SIZE) {
+          batches.push(txIds.slice(i, i + BATCH_SIZE))
+        }
 
-        if (itemsError) {
-          console.error('items error:', itemsError.message || String(itemsError))
-        } else if (items) {
-          itemsData = items
+        for (const batch of batches) {
+          const { data: items, error: itemsError } = await supabase
+            .from('transaction_items')
+            .select('transaction_id, product_id')
+            .in('transaction_id', batch)
+
+          if (itemsError) {
+            console.error('items error:', itemsError.message || String(itemsError))
+          } else if (items) {
+            itemsData.push(...items)
+          }
         }
       }
 
-      // Step 3: products取得（空配列チェック追加）
+      // Step 3: products取得（バッチ処理でSafari対応）
       const productIds = [...new Set(itemsData.map((i) => i.product_id))]
       const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
 
       if (productIds.length > 0) {
-        const { data: productsData, error: prodError } = await supabase
-          .from('products')
-          .select('id, name, image_url, product_code')
-          .in('id', productIds)
+        // Safari対策: 50件ずつバッチ処理
+        const BATCH_SIZE = 50
+        const batches = []
+        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+          batches.push(productIds.slice(i, i + BATCH_SIZE))
+        }
 
-        if (prodError) {
-          console.error('products error:', prodError.message || String(prodError))
-        } else if (productsData) {
-          for (const p of productsData) {
-            productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+        for (const batch of batches) {
+          const { data: productsData, error: prodError } = await supabase
+            .from('products')
+            .select('id, name, image_url, product_code')
+            .in('id', batch)
+
+          if (prodError) {
+            console.error('products error:', prodError.message || String(prodError))
+          } else if (productsData) {
+            for (const p of productsData) {
+              productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+            }
           }
         }
       }
