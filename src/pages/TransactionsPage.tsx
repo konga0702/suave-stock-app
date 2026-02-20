@@ -69,49 +69,63 @@ export function TransactionsPage() {
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
 
   const load = useCallback(async () => {
-    // Step 1: transactions取得
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('status', tab)
-      .order('date', { ascending: false })
+    try {
+      // Step 1: transactions取得
+      const { data, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('status', tab)
+        .order('date', { ascending: false })
 
-    if (!data || data.length === 0) {
-      setTransactions([])
-      return
-    }
+      if (txError) {
+        console.error('transactions error:', txError.message || String(txError))
+        setTransactions([])
+        return
+      }
 
-    // Step 2: transaction_items取得
-    const txIds = data.map((tx) => tx.id)
-    const { data: itemsData, error: itemsError } = await supabase
-      .from('transaction_items')
-      .select('transaction_id, product_id')
-      .in('transaction_id', txIds)
+      if (!data || data.length === 0) {
+        setTransactions([])
+        return
+      }
 
-    if (itemsError) console.error('items error:', itemsError)
+      // Step 2: transaction_items取得（空配列チェック追加）
+      const txIds = data.map((tx) => tx.id)
+      let itemsData: { transaction_id: string; product_id: string }[] = []
 
-    // Step 3: products取得
-    const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
-    const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
+      if (txIds.length > 0) {
+        const { data: items, error: itemsError } = await supabase
+          .from('transaction_items')
+          .select('transaction_id, product_id')
+          .in('transaction_id', txIds)
 
-    if (productIds.length > 0) {
-      const { data: productsData, error: prodError } = await supabase
-        .from('products')
-        .select('id, name, image_url, product_code')
-        .in('id', productIds)
-
-      if (prodError) console.error('products error:', prodError)
-
-      if (productsData) {
-        for (const p of productsData) {
-          productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+        if (itemsError) {
+          console.error('items error:', itemsError.message || String(itemsError))
+        } else if (items) {
+          itemsData = items
         }
       }
-    }
 
-    // Step 4: マッピング
-    const txProductMap = new Map<string, { image_url: string | null; name: string; product_code: string | null; count: number }>()
-    if (itemsData) {
+      // Step 3: products取得（空配列チェック追加）
+      const productIds = [...new Set(itemsData.map((i) => i.product_id))]
+      const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
+
+      if (productIds.length > 0) {
+        const { data: productsData, error: prodError } = await supabase
+          .from('products')
+          .select('id, name, image_url, product_code')
+          .in('id', productIds)
+
+        if (prodError) {
+          console.error('products error:', prodError.message || String(prodError))
+        } else if (productsData) {
+          for (const p of productsData) {
+            productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+          }
+        }
+      }
+
+      // Step 4: マッピング
+      const txProductMap = new Map<string, { image_url: string | null; name: string; product_code: string | null; count: number }>()
       for (const item of itemsData) {
         const existing = txProductMap.get(item.transaction_id)
         const product = productsMap.get(item.product_id)
@@ -126,20 +140,23 @@ export function TransactionsPage() {
           existing.count++
         }
       }
-    }
 
-    setTransactions(
-      data.map((tx) => {
-        const productInfo = txProductMap.get(tx.id)
-        return {
-          ...tx,
-          firstProductImage: productInfo?.image_url ?? null,
-          firstProductName: productInfo?.name ?? null,
-          firstProductCode: productInfo?.product_code ?? null,
-          itemCount: productInfo?.count ?? 0,
-        }
-      })
-    )
+      setTransactions(
+        data.map((tx) => {
+          const productInfo = txProductMap.get(tx.id)
+          return {
+            ...tx,
+            firstProductImage: productInfo?.image_url ?? null,
+            firstProductName: productInfo?.name ?? null,
+            firstProductCode: productInfo?.product_code ?? null,
+            itemCount: productInfo?.count ?? 0,
+          }
+        })
+      )
+    } catch (err) {
+      console.error('load error:', err)
+      setTransactions([])
+    }
   }, [tab])
 
   useEffect(() => {
@@ -229,21 +246,27 @@ export function TransactionsPage() {
       result = result.filter((tx) => tx.partner_name === partnerFilter)
     }
 
-    // 5. ソート
+    // 5. ソート（Safari互換性対応）
     result = [...result].sort((a, b) => {
       switch (sortKey) {
         case 'date_desc':
-          return b.date.localeCompare(a.date)
+          return (b.date || '').localeCompare(a.date || '')
         case 'date_asc':
-          return a.date.localeCompare(b.date)
-        case 'amount_desc':
-          return Number(b.total_amount) - Number(a.total_amount)
-        case 'amount_asc':
-          return Number(a.total_amount) - Number(b.total_amount)
+          return (a.date || '').localeCompare(b.date || '')
+        case 'amount_desc': {
+          const aAmount = Number(a.total_amount) || 0
+          const bAmount = Number(b.total_amount) || 0
+          return bAmount - aAmount
+        }
+        case 'amount_asc': {
+          const aAmount = Number(a.total_amount) || 0
+          const bAmount = Number(b.total_amount) || 0
+          return aAmount - bAmount
+        }
         case 'partner':
-          return (a.partner_name ?? '').localeCompare(b.partner_name ?? '', 'ja')
+          return (a.partner_name || '').localeCompare(b.partner_name || '')
         case 'category':
-          return (a.category ?? '').localeCompare(b.category ?? '', 'ja')
+          return (a.category || '').localeCompare(b.category || '')
         default:
           return 0
       }
