@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter } from 'lucide-react'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, CalendarCheck, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
-import { exportTransactionsCsv, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
+import { exportTransactionsDetailCsvWithFilters, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
+import type { ExportProgress } from '@/lib/csv'
 import { toast } from 'sonner'
 import type { Transaction } from '@/types/database'
 
@@ -57,56 +58,97 @@ export function TransactionsPage() {
   const [partnerFilter, setPartnerFilter] = useState<string>('all')
   const [showSortFilter, setShowSortFilter] = useState(false)
 
+  // CSVエクスポート進捗
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
+  const exportAbortRef = useRef<AbortController | null>(null)
+
   // 選択モード
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // 一括完了機能
+  const [dateCutoff, setDateCutoff] = useState('2026-02-16')
+  const [completing, setCompleting] = useState(false)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+
   const load = useCallback(async () => {
-    // Step 1: transactions取得
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('status', tab)
-      .order('date', { ascending: false })
+    try {
+      // Step 1: transactions取得
+      const { data, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('status', tab)
+        .order('date', { ascending: false })
 
-    if (!data || data.length === 0) {
-      setTransactions([])
-      return
-    }
+      if (txError) {
+        console.error('transactions error:', txError.message || String(txError))
+        setTransactions([])
+        return
+      }
 
-    // Step 2: transaction_items取得
-    const txIds = data.map((tx) => tx.id)
-    const { data: itemsData, error: itemsError } = await supabase
-      .from('transaction_items')
-      .select('transaction_id, product_id')
-      .in('transaction_id', txIds)
+      if (!data || data.length === 0) {
+        setTransactions([])
+        return
+      }
 
-    if (itemsError) console.error('items error:', itemsError)
+      // Step 2: transaction_items取得（バッチ処理でSafari対応）
+      const txIds = data.map((tx) => tx.id)
+      let itemsData: { transaction_id: string; product_id: string }[] = []
 
-    // Step 3: products取得
-    const productIds = [...new Set((itemsData ?? []).map((i) => i.product_id))]
-    const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
+      if (txIds.length > 0) {
+        // Safari対策: 50件ずつバッチ処理
+        const BATCH_SIZE = 50
+        const batches = []
+        for (let i = 0; i < txIds.length; i += BATCH_SIZE) {
+          batches.push(txIds.slice(i, i + BATCH_SIZE))
+        }
 
-    if (productIds.length > 0) {
-      const { data: productsData, error: prodError } = await supabase
-        .from('products')
-        .select('id, name, image_url, product_code')
-        .in('id', productIds)
+        for (const batch of batches) {
+          const { data: items, error: itemsError } = await supabase
+            .from('transaction_items')
+            .select('transaction_id, product_id')
+            .in('transaction_id', batch)
 
-      if (prodError) console.error('products error:', prodError)
-
-      if (productsData) {
-        for (const p of productsData) {
-          productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+          if (itemsError) {
+            console.error('items error:', itemsError.message || String(itemsError))
+          } else if (items) {
+            itemsData.push(...items)
+          }
         }
       }
-    }
 
-    // Step 4: マッピング
-    const txProductMap = new Map<string, { image_url: string | null; name: string; product_code: string | null; count: number }>()
-    if (itemsData) {
+      // Step 3: products取得（バッチ処理でSafari対応）
+      const productIds = [...new Set(itemsData.map((i) => i.product_id))]
+      const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
+
+      if (productIds.length > 0) {
+        // Safari対策: 50件ずつバッチ処理
+        const BATCH_SIZE = 50
+        const batches = []
+        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+          batches.push(productIds.slice(i, i + BATCH_SIZE))
+        }
+
+        for (const batch of batches) {
+          const { data: productsData, error: prodError } = await supabase
+            .from('products')
+            .select('id, name, image_url, product_code')
+            .in('id', batch)
+
+          if (prodError) {
+            console.error('products error:', prodError.message || String(prodError))
+          } else if (productsData) {
+            for (const p of productsData) {
+              productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
+            }
+          }
+        }
+      }
+
+      // Step 4: マッピング
+      const txProductMap = new Map<string, { image_url: string | null; name: string; product_code: string | null; count: number }>()
       for (const item of itemsData) {
         const existing = txProductMap.get(item.transaction_id)
         const product = productsMap.get(item.product_id)
@@ -121,20 +163,23 @@ export function TransactionsPage() {
           existing.count++
         }
       }
-    }
 
-    setTransactions(
-      data.map((tx) => {
-        const productInfo = txProductMap.get(tx.id)
-        return {
-          ...tx,
-          firstProductImage: productInfo?.image_url ?? null,
-          firstProductName: productInfo?.name ?? null,
-          firstProductCode: productInfo?.product_code ?? null,
-          itemCount: productInfo?.count ?? 0,
-        }
-      })
-    )
+      setTransactions(
+        data.map((tx) => {
+          const productInfo = txProductMap.get(tx.id)
+          return {
+            ...tx,
+            firstProductImage: productInfo?.image_url ?? null,
+            firstProductName: productInfo?.name ?? null,
+            firstProductCode: productInfo?.product_code ?? null,
+            itemCount: productInfo?.count ?? 0,
+          }
+        })
+      )
+    } catch (err) {
+      console.error('load error:', err)
+      setTransactions([])
+    }
   }, [tab])
 
   useEffect(() => {
@@ -171,6 +216,44 @@ export function TransactionsPage() {
     }
     input.click()
   }
+
+  // CSVエクスポート（全件・フィルタ対応）
+  const handleExport = useCallback(async () => {
+    if (exportProgress) return  // 二重実行防止
+
+    const controller = new AbortController()
+    exportAbortRef.current = controller
+
+    try {
+      await exportTransactionsDetailCsvWithFilters(
+        {
+          status: tab,
+          type: typeFilter !== 'ALL' ? typeFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          partnerName: partnerFilter !== 'all' ? partnerFilter : undefined,
+          search: search || undefined,
+        },
+        (progress) => setExportProgress(progress),
+        controller.signal,
+      )
+      setExportProgress(null)
+      toast.success('CSVをエクスポートしました')
+    } catch (err: unknown) {
+      setExportProgress(null)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        toast.info('エクスポートをキャンセルしました')
+      } else {
+        const msg = err instanceof Error ? err.message : 'エクスポートに失敗しました'
+        toast.error(msg)
+      }
+    } finally {
+      exportAbortRef.current = null
+    }
+  }, [exportProgress, tab, typeFilter, categoryFilter, partnerFilter, search])
+
+  const handleExportCancel = useCallback(() => {
+    exportAbortRef.current?.abort()
+  }, [])
 
   // カテゴリ一覧
   const categories = useMemo(() => {
@@ -224,21 +307,27 @@ export function TransactionsPage() {
       result = result.filter((tx) => tx.partner_name === partnerFilter)
     }
 
-    // 5. ソート
+    // 5. ソート（Safari互換性対応）
     result = [...result].sort((a, b) => {
       switch (sortKey) {
         case 'date_desc':
-          return b.date.localeCompare(a.date)
+          return (b.date || '').localeCompare(a.date || '')
         case 'date_asc':
-          return a.date.localeCompare(b.date)
-        case 'amount_desc':
-          return Number(b.total_amount) - Number(a.total_amount)
-        case 'amount_asc':
-          return Number(a.total_amount) - Number(b.total_amount)
+          return (a.date || '').localeCompare(b.date || '')
+        case 'amount_desc': {
+          const aAmount = Number(a.total_amount) || 0
+          const bAmount = Number(b.total_amount) || 0
+          return bAmount - aAmount
+        }
+        case 'amount_asc': {
+          const aAmount = Number(a.total_amount) || 0
+          const bAmount = Number(b.total_amount) || 0
+          return aAmount - bAmount
+        }
         case 'partner':
-          return (a.partner_name ?? '').localeCompare(b.partner_name ?? '', 'ja')
+          return (a.partner_name || '').localeCompare(b.partner_name || '')
         case 'category':
-          return (a.category ?? '').localeCompare(b.category ?? '', 'ja')
+          return (a.category || '').localeCompare(b.category || '')
         default:
           return 0
       }
@@ -277,6 +366,53 @@ export function TransactionsPage() {
     }
   }
 
+  // 日付指定で自動選択
+  const selectByDate = () => {
+    if (!dateCutoff) return
+    const cutoffDate = new Date(dateCutoff)
+    const selected = new Set<string>()
+
+    filteredAndSorted.forEach((tx) => {
+      const txDate = new Date(tx.date)
+      if (txDate <= cutoffDate) {
+        selected.add(tx.id)
+      }
+    })
+
+    setSelectedIds(selected)
+    toast.info(`${selected.size}件を選択しました`)
+  }
+
+  // 一括完了
+  const handleBulkComplete = async () => {
+    setCompleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+
+      // statusのみをCOMPLETEDに更新（在庫への影響なし）
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          status: 'COMPLETED',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', ids)
+        .eq('status', 'SCHEDULED') // 念のため予定のみ対象
+
+      if (error) throw error
+
+      toast.success(`${ids.length}件の予定を履歴に移動しました`)
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      setShowCompleteConfirm(false)
+      load()
+    } catch {
+      toast.error('完了処理に失敗しました')
+    } finally {
+      setCompleting(false)
+    }
+  }
+
   // 一括削除
   const handleBulkDelete = async () => {
     setDeleting(true)
@@ -309,6 +445,19 @@ export function TransactionsPage() {
 
   return (
     <div className="page-transition space-y-5">
+      {/* CSVエクスポート進捗バナー */}
+      {exportProgress && exportProgress.phase !== 'done' && (
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-accent/50 px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">
+            {exportProgress.phase === 'counting' && '件数を確認中...'}
+            {exportProgress.phase === 'fetching' && `取得中 ${exportProgress.fetched} / ${exportProgress.total} 件`}
+            {exportProgress.phase === 'processing' && `CSV生成中 (${exportProgress.total} 件)`}
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleExportCancel}>
+            キャンセル
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">入出庫</h1>
         <div className="flex gap-1.5">
@@ -320,8 +469,18 @@ export function TransactionsPage() {
               <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
                 <Upload className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={() => exportTransactionsCsv(transactions)} title="CSVエクスポート">
-                <Download className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                onClick={handleExport}
+                disabled={!!exportProgress}
+                title="CSVエクスポート（全件）"
+              >
+                {exportProgress && exportProgress.phase !== 'done'
+                  ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  : <Download className="h-4 w-4" />
+                }
               </Button>
               <Button
                 variant="outline"
@@ -456,6 +615,29 @@ export function TransactionsPage() {
             すべてクリア
           </button>
         </div>
+      )}
+
+      {/* 選択モード時の日付選択UI（予定タブのみ） */}
+      {selectMode && tab === 'SCHEDULED' && (
+        <Card className="border-2 border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/20 shadow-sm">
+          <CardContent className="flex items-center gap-2 p-3">
+            <CalendarCheck className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <Input
+              type="date"
+              value={dateCutoff}
+              onChange={(e) => setDateCutoff(e.target.value)}
+              className="flex-1 h-9 rounded-lg border-sky-300 dark:border-sky-700 bg-white dark:bg-slate-900 text-sm"
+            />
+            <span className="text-xs text-sky-700 dark:text-sky-300 font-medium shrink-0">以前を</span>
+            <Button
+              onClick={selectByDate}
+              size="sm"
+              className="h-9 rounded-lg bg-sky-500 hover:bg-sky-600 text-white shadow-sm text-xs font-semibold px-4"
+            >
+              選択
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* 件数表示 */}
@@ -645,20 +827,32 @@ export function TransactionsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* 選択モード時のフローティング削除バー */}
+      {/* 選択モード時のフローティングアクションバー */}
       {selectMode && selectedIds.size > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-50 animate-fade-in">
           <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-800 dark:bg-slate-200 p-4 shadow-xl shadow-slate-900/30">
             <p className="text-sm font-semibold text-white dark:text-slate-900">
               {selectedIds.size}件選択中
             </p>
-            <Button
-              className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all text-xs font-semibold"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              まとめて削除
-            </Button>
+            <div className="flex gap-2">
+              {tab === 'SCHEDULED' && (
+                <Button
+                  className="rounded-xl bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-sky-500/25 transition-all text-xs font-semibold"
+                  onClick={() => setShowCompleteConfirm(true)}
+                  disabled={completing}
+                >
+                  <CheckCircle className="mr-1.5 h-4 w-4" />
+                  {completing ? '処理中...' : 'まとめて完了'}
+                </Button>
+              )}
+              <Button
+                className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all text-xs font-semibold"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                まとめて削除
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -680,6 +874,29 @@ export function TransactionsPage() {
               disabled={deleting}
             >
               {deleting ? '削除中...' : `${selectedIds.size}件を削除`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 一括完了確認ダイアログ */}
+      <AlertDialog open={showCompleteConfirm} onOpenChange={setShowCompleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{selectedIds.size}件の予定を履歴に移動しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作により、選択した{selectedIds.size}件の予定のステータスが「完了」に変更され、履歴タブに移動します。
+              在庫数への影響はありません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={completing}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkComplete}
+              className="bg-sky-500 hover:bg-sky-600 rounded-xl"
+              disabled={completing}
+            >
+              {completing ? '処理中...' : `${selectedIds.size}件を完了`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

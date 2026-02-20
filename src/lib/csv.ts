@@ -138,49 +138,138 @@ export async function importProductsCsv(text: string) {
 
 // ---- Transactions CSV (詳細版: 商品名・数量・単価を含む) ----
 
-export async function exportTransactionsDetailCsv() {
-  // 全トランザクション取得
-  const { data: txs } = await supabase
+export interface TransactionExportFilters {
+  status?: string        // 'SCHEDULED' | 'COMPLETED'
+  type?: 'IN' | 'OUT'   // 入庫/出庫フィルター
+  category?: string      // カテゴリフィルター
+  partnerName?: string   // 取引先フィルター
+  search?: string        // テキスト検索（partner_name, tracking_number, order_code, shipping_code, memo, category）
+}
+
+export interface ExportProgress {
+  phase: 'counting' | 'fetching' | 'processing' | 'done'
+  fetched: number
+  total: number
+}
+
+/**
+ * 全件CSVエクスポート（フィルタ対応・ページング取得）
+ * - Supabase/PostgRESTの1000件デフォルト上限を回避するため、PAGE_SIZE単位で分割取得
+ * - フィルタはDBクエリ側で適用（クライアント側の表示件数に依存しない）
+ * - onProgress コールバックで進捗を通知
+ */
+export async function exportTransactionsDetailCsvWithFilters(
+  filters: TransactionExportFilters = {},
+  onProgress?: (progress: ExportProgress) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const PAGE_SIZE = 500
+
+  // Step 1: 総件数を取得
+  onProgress?.({ phase: 'counting', fetched: 0, total: 0 })
+
+  let countQuery = supabase
     .from('transactions')
-    .select('*')
-    .order('date', { ascending: false })
+    .select('*', { count: 'exact', head: true })
 
-  if (!txs || txs.length === 0) return
+  if (filters.status) countQuery = countQuery.eq('status', filters.status)
+  if (filters.type)   countQuery = countQuery.eq('type', filters.type)
+  if (filters.category && filters.category !== 'all') countQuery = countQuery.eq('category', filters.category)
+  if (filters.partnerName && filters.partnerName !== 'all') countQuery = countQuery.eq('partner_name', filters.partnerName)
 
-  // transaction_items + product を取得
+  const { count, error: countError } = await countQuery
+  if (countError) throw new Error(`件数取得エラー: ${countError.message}`)
+  const total = count ?? 0
+  if (total === 0) return
+
+  // Step 2: ページング取得でtransactionsを全件取得
+  onProgress?.({ phase: 'fetching', fetched: 0, total })
+
+  const allTxs: Transaction[] = []
+  for (let from = 0; from < total; from += PAGE_SIZE) {
+    if (signal?.aborted) throw new DOMException('エクスポートがキャンセルされました', 'AbortError')
+
+    let pageQuery = supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (filters.status) pageQuery = pageQuery.eq('status', filters.status)
+    if (filters.type)   pageQuery = pageQuery.eq('type', filters.type)
+    if (filters.category && filters.category !== 'all') pageQuery = pageQuery.eq('category', filters.category)
+    if (filters.partnerName && filters.partnerName !== 'all') pageQuery = pageQuery.eq('partner_name', filters.partnerName)
+
+    const { data: pageData, error: pageError } = await pageQuery
+    if (pageError) throw new Error(`データ取得エラー (offset=${from}): ${pageError.message}`)
+    if (pageData) allTxs.push(...(pageData as Transaction[]))
+
+    onProgress?.({ phase: 'fetching', fetched: allTxs.length, total })
+  }
+
+  // クライアント側のテキスト検索（DB側でのilike相当。列が多いためクライアントフィルタで対応）
+  let txs = allTxs
+  if (filters.search) {
+    const q = filters.search.toLowerCase()
+    txs = txs.filter((tx) =>
+      tx.partner_name?.toLowerCase().includes(q) ||
+      tx.tracking_number?.toLowerCase().includes(q) ||
+      tx.order_code?.toLowerCase().includes(q) ||
+      tx.shipping_code?.toLowerCase().includes(q) ||
+      tx.memo?.toLowerCase().includes(q) ||
+      tx.category?.toLowerCase().includes(q) ||
+      (tx.type === 'IN' ? '入庫' : '出庫').includes(q)
+    )
+    if (txs.length === 0) return
+  }
+
+  // Step 3: transaction_items を取得（txIds は最大1000件ずつ .in() を分割）
+  onProgress?.({ phase: 'processing', fetched: txs.length, total: txs.length })
+
   const txIds = txs.map((t) => t.id)
-  const { data: items } = await supabase
-    .from('transaction_items')
-    .select('transaction_id, product_id, quantity, price')
-    .in('transaction_id', txIds)
+  const allItems: Array<{ transaction_id: string; product_id: string; quantity: number; price: number }> = []
 
-  // products 取得
-  const productIds = [...new Set((items ?? []).map((i) => i.product_id))]
+  const IN_CHUNK = 200  // .in() の引数上限を考慮
+  for (let i = 0; i < txIds.length; i += IN_CHUNK) {
+    if (signal?.aborted) throw new DOMException('エクスポートがキャンセルされました', 'AbortError')
+    const chunk = txIds.slice(i, i + IN_CHUNK)
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('transaction_items')
+      .select('transaction_id, product_id, quantity, price')
+      .in('transaction_id', chunk)
+    if (itemsError) throw new Error(`明細取得エラー: ${itemsError.message}`)
+    if (itemsData) allItems.push(...itemsData)
+  }
+
+  // Step 4: products を取得
+  const productIds = [...new Set(allItems.map((i) => i.product_id))]
   const productsMap = new Map<string, string>()
-  if (productIds.length > 0) {
-    const { data: prods } = await supabase
+  for (let i = 0; i < productIds.length; i += IN_CHUNK) {
+    if (signal?.aborted) throw new DOMException('エクスポートがキャンセルされました', 'AbortError')
+    const chunk = productIds.slice(i, i + IN_CHUNK)
+    const { data: prods, error: prodsError } = await supabase
       .from('products')
       .select('id, name')
-      .in('id', productIds)
+      .in('id', chunk)
+    if (prodsError) throw new Error(`商品取得エラー: ${prodsError.message}`)
     if (prods) {
       for (const p of prods) productsMap.set(p.id, p.name)
     }
   }
 
-  // トランザクションごとに明細をグループ化
+  // Step 5: トランザクションごとに明細をグループ化
   const itemsByTx = new Map<string, Array<{ product_name: string; quantity: number; price: number }>>()
-  if (items) {
-    for (const item of items) {
-      const list = itemsByTx.get(item.transaction_id) ?? []
-      list.push({
-        product_name: productsMap.get(item.product_id) ?? '',
-        quantity: item.quantity,
-        price: Number(item.price),
-      })
-      itemsByTx.set(item.transaction_id, list)
-    }
+  for (const item of allItems) {
+    const list = itemsByTx.get(item.transaction_id) ?? []
+    list.push({
+      product_name: productsMap.get(item.product_id) ?? '',
+      quantity: item.quantity,
+      price: Number(item.price),
+    })
+    itemsByTx.set(item.transaction_id, list)
   }
 
+  // Step 6: CSV生成
   const header = '日付,区分,カテゴリ,ステータス,商品名,数量,単価,小計,合計金額,取引先,管理番号,注文コード,追跡コード,メモ'
 
   const rows: string[] = []
@@ -190,7 +279,6 @@ export async function exportTransactionsDetailCsv() {
     const statusName = tx.status === 'COMPLETED' ? '完了' : '予定'
 
     if (txItems.length === 0) {
-      // 明細なしの場合は1行
       rows.push([
         tx.date,
         esc(typeName),
@@ -208,7 +296,6 @@ export async function exportTransactionsDetailCsv() {
         esc(tx.memo),
       ].join(','))
     } else {
-      // 明細ごとに1行（最初の行にトランザクション情報を含む）
       txItems.forEach((item, idx) => {
         const subtotal = item.quantity * item.price
         rows.push([
@@ -231,15 +318,22 @@ export async function exportTransactionsDetailCsv() {
     }
   }
 
+  onProgress?.({ phase: 'done', fetched: txs.length, total: txs.length })
+
   downloadCsv(
     `transaction_report_${todayStr()}.csv`,
     [header, ...rows].join('\n')
   )
 }
 
+// 旧互換（フィルタなし・全件エクスポート）
+export async function exportTransactionsDetailCsv() {
+  return exportTransactionsDetailCsvWithFilters()
+}
+
 // 旧互換（インポート用）
 export function exportTransactionsCsv(_transactions: Transaction[]) {
-  exportTransactionsDetailCsv()
+  exportTransactionsDetailCsvWithFilters()
 }
 
 /**
