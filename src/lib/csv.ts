@@ -27,36 +27,51 @@ function esc(value: string | number | null | undefined): string {
 function parseCsvRows(text: string): string[][] {
   // BOM除去 + 改行コード統一(CRLF→LF)
   const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const lines = cleaned.trim().split('\n')
-  return lines.map((line) => {
-    const row: string[] = []
-    let current = ''
-    let inQuotes = false
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else if (char === '"') {
-          inQuotes = false
-        } else {
-          current += char
-        }
+
+  // 全テキストを1文字ずつ走査（クォート内の改行を正しくセル内改行として扱う）
+  const rows: string[][] = []
+  let row: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i]
+    if (inQuotes) {
+      if (char === '"' && cleaned[i + 1] === '"') {
+        // "" → " (エスケープされたクォート)
+        current += '"'
+        i++
+      } else if (char === '"') {
+        // クォート終了
+        inQuotes = false
       } else {
-        if (char === '"') {
-          inQuotes = true
-        } else if (char === ',') {
-          row.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
+        // クォート内の文字（改行含む）はそのままセルの値に
+        current += char
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true
+      } else if (char === ',') {
+        row.push(current.trim())
+        current = ''
+      } else if (char === '\n') {
+        // 行の区切り
+        row.push(current.trim())
+        rows.push(row)
+        row = []
+        current = ''
+      } else {
+        current += char
       }
     }
+  }
+  // 最終行（末尾に改行がない場合も対応）
+  if (current || row.length > 0) {
     row.push(current.trim())
-    return row
-  })
+    rows.push(row)
+  }
+
+  return rows
 }
 
 // ---- Products CSV ----
