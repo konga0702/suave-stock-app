@@ -164,9 +164,17 @@ export function TransactionsPage() {
 
   // race condition 防止用
   const loadIdRef = useRef(0)
+  // タブごとのデータキャッシュ（タブ戻り時に瞬時表示）
+  const dataCache = useRef<{ SCHEDULED?: TxWithProducts[]; COMPLETED?: TxWithProducts[] }>({})
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = false) => {
     const currentLoadId = ++loadIdRef.current
+    const cacheKey = tab as 'SCHEDULED' | 'COMPLETED'
+
+    // キャッシュヒット時は即座に表示（楽観的更新）
+    if (!forceRefresh && dataCache.current[cacheKey]) {
+      setTransactions(dataCache.current[cacheKey]!)
+    }
 
     try {
       // Step 1: transactions全件取得（Supabaseデフォルト1000件制限をページングで回避）
@@ -198,62 +206,73 @@ export function TransactionsPage() {
       if (currentLoadId !== loadIdRef.current) return
 
       if (allTxData.length === 0) {
+        dataCache.current[cacheKey] = []
         setTransactions([])
         return
       }
 
-      // Step 2: transaction_items取得（バッチ処理でSafari対応）
+      // Step 2: transaction_items取得（Promise.allで並列化）
       const txIds = allTxData.map((tx) => tx.id)
       let itemsData: { transaction_id: string; product_id: string }[] = []
 
       if (txIds.length > 0) {
-        // Safari対策: 50件ずつバッチ処理
         const BATCH_SIZE = 50
-        const batches = []
+        const txBatches: string[][] = []
         for (let i = 0; i < txIds.length; i += BATCH_SIZE) {
-          batches.push(txIds.slice(i, i + BATCH_SIZE))
+          txBatches.push(txIds.slice(i, i + BATCH_SIZE))
         }
 
-        for (const batch of batches) {
-          if (currentLoadId !== loadIdRef.current) return // 中断チェック
-          const { data: items, error: itemsError } = await supabase
-            .from('transaction_items')
-            .select('transaction_id, product_id')
-            .in('transaction_id', batch)
+        // 全バッチを並列実行（直列25回→並列で大幅高速化）
+        const itemsResults = await Promise.all(
+          txBatches.map((batch) =>
+            supabase
+              .from('transaction_items')
+              .select('transaction_id, product_id')
+              .in('transaction_id', batch)
+          )
+        )
 
-          if (itemsError) {
-            console.error('items error:', itemsError.message || String(itemsError))
-          } else if (items) {
-            itemsData.push(...items)
+        if (currentLoadId !== loadIdRef.current) return // 中断チェック
+
+        for (const result of itemsResults) {
+          if (result.error) {
+            console.error('items error:', result.error.message || String(result.error))
+          } else if (result.data) {
+            itemsData.push(...result.data)
           }
         }
       }
 
       if (currentLoadId !== loadIdRef.current) return // 中断チェック
 
-      // Step 3: products取得（バッチ処理でSafari対応）
+      // Step 3: products取得（Promise.allで並列化）
       const productIds = [...new Set(itemsData.map((i) => i.product_id))]
       const productsMap = new Map<string, { name: string; image_url: string | null; product_code: string | null }>()
 
       if (productIds.length > 0) {
-        // Safari対策: 50件ずつバッチ処理
         const BATCH_SIZE = 50
-        const batches = []
+        const pBatches: string[][] = []
         for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-          batches.push(productIds.slice(i, i + BATCH_SIZE))
+          pBatches.push(productIds.slice(i, i + BATCH_SIZE))
         }
 
-        for (const batch of batches) {
-          if (currentLoadId !== loadIdRef.current) return // 中断チェック
-          const { data: productsData, error: prodError } = await supabase
-            .from('products')
-            .select('id, name, image_url, product_code')
-            .in('id', batch)
+        // 全バッチを並列実行
+        const productsResults = await Promise.all(
+          pBatches.map((batch) =>
+            supabase
+              .from('products')
+              .select('id, name, image_url, product_code')
+              .in('id', batch)
+          )
+        )
 
-          if (prodError) {
-            console.error('products error:', prodError.message || String(prodError))
-          } else if (productsData) {
-            for (const p of productsData) {
+        if (currentLoadId !== loadIdRef.current) return // 中断チェック
+
+        for (const result of productsResults) {
+          if (result.error) {
+            console.error('products error:', result.error.message || String(result.error))
+          } else if (result.data) {
+            for (const p of result.data) {
               productsMap.set(p.id, { name: p.name, image_url: p.image_url ?? null, product_code: p.product_code ?? null })
             }
           }
@@ -279,18 +298,20 @@ export function TransactionsPage() {
         }
       }
 
-      setTransactions(
-        allTxData.map((tx) => {
-          const productInfo = txProductMap.get(tx.id)
-          return {
-            ...tx,
-            firstProductImage: productInfo?.image_url ?? null,
-            firstProductName: productInfo?.name ?? null,
-            firstProductCode: productInfo?.product_code ?? null,
-            itemCount: productInfo?.count ?? 0,
-          }
-        })
-      )
+      const result = allTxData.map((tx) => {
+        const productInfo = txProductMap.get(tx.id)
+        return {
+          ...tx,
+          firstProductImage: productInfo?.image_url ?? null,
+          firstProductName: productInfo?.name ?? null,
+          firstProductCode: productInfo?.product_code ?? null,
+          itemCount: productInfo?.count ?? 0,
+        }
+      })
+
+      // キャッシュに保存してから表示
+      dataCache.current[cacheKey] = result
+      setTransactions(result)
     } catch (err) {
       console.error('load error:', err)
       if (currentLoadId === loadIdRef.current) setTransactions([])
@@ -323,12 +344,12 @@ export function TransactionsPage() {
         const text = await file.text()
         const count = await importTransactionsCsv(text)
         toast.success(`${count}件の取引をインポートしました`)
-        load()
+        load(true)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'インポートに失敗しました'
         if (msg.includes('件の取引を登録しました')) {
           toast.warning(msg, { duration: 8000 })
-          load()
+          load(true)
         } else {
           toast.error(msg)
         }
@@ -538,7 +559,9 @@ export function TransactionsPage() {
       setSelectedIds(new Set())
       setSelectMode(false)
       setShowCompleteConfirm(false)
-      load()
+      // 両タブのキャッシュを無効化（移動後は両方変わるため）
+      dataCache.current = {}
+      load(true)
     } catch {
       toast.error('完了処理に失敗しました')
     } finally {
@@ -565,7 +588,9 @@ export function TransactionsPage() {
       setSelectedIds(new Set())
       setSelectMode(false)
       setShowDeleteConfirm(false)
-      load()
+      // キャッシュを無効化してから再取得
+      dataCache.current[tab as 'SCHEDULED' | 'COMPLETED'] = undefined
+      load(true)
     } catch {
       toast.error('削除に失敗しました')
     } finally {
