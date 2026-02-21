@@ -120,7 +120,7 @@ export function TransactionsPage() {
     const s = searchParams.get('status')
     return s === 'COMPLETED' || s === 'SCHEDULED' ? s : 'SCHEDULED'
   })
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>(() => {
+  const [typeFilter] = useState<'ALL' | 'IN' | 'OUT'>(() => {
     const t = searchParams.get('type')
     return t === 'IN' || t === 'OUT' ? t : 'ALL'
   })
