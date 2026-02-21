@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +22,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { supabase } from '@/lib/supabase'
 import { exportTransactionsDetailCsvWithFilters, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
 import type { ExportProgress } from '@/lib/csv'
@@ -67,6 +73,10 @@ export function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // FABボトムシート用
+  const [showFab, setShowFab] = useState(false)
+  const navigate = useNavigate()
 
   const load = useCallback(async () => {
     // Step 1: transactions取得
@@ -398,10 +408,12 @@ export function TransactionsPage() {
               >
                 <CheckSquare className="h-4 w-4" />
               </Button>
-              <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-slate-800 text-white shadow-sm hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all">
-                <Link to="/transactions/new">
-                  <Plus className="h-4 w-4" />
-                </Link>
+              <Button
+                size="icon"
+                className="h-9 w-9 rounded-xl bg-slate-800 text-white shadow-sm hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all"
+                onClick={() => setShowFab(true)}
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </>
           ) : (
@@ -535,8 +547,8 @@ export function TransactionsPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full rounded-xl bg-muted/50 p-1">
-          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">予定</TabsTrigger>
-          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">履歴</TabsTrigger>
+          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業予定</TabsTrigger>
+          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業履歴</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-4 space-y-2">
           {filteredAndSorted.length === 0 ? (
@@ -750,6 +762,58 @@ export function TransactionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* FABボトムシート：タブに応じて選択肢を変える */}
+      <Sheet open={showFab} onOpenChange={setShowFab}>
+        <SheetContent side="bottom" className="rounded-t-2xl pb-10">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-base font-semibold">
+              {tab === 'SCHEDULED' ? '作業予定を登録' : '作業を登録'}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-2 px-1">
+            {/* 入荷 or 入荷予定 */}
+            <button
+              className="w-full flex items-center gap-4 rounded-2xl p-4 text-left bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 active:scale-[0.98] transition-all"
+              onClick={() => { setShowFab(false); navigate(`/transactions/new?type=IN&status=${tab}`) }}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900">
+                <ArrowDownToLine className="h-5 w-5 text-sky-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-[15px]">{tab === 'SCHEDULED' ? '入荷予定' : '入荷'}</p>
+                <p className="text-xs text-muted-foreground">{tab === 'SCHEDULED' ? '入荷の予定を登録' : '入荷を直接登録'}</p>
+              </div>
+            </button>
+            {/* 出荷 or 出荷予定 */}
+            <button
+              className="w-full flex items-center gap-4 rounded-2xl p-4 text-left bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 active:scale-[0.98] transition-all"
+              onClick={() => { setShowFab(false); navigate(`/transactions/new?type=OUT&status=${tab}`) }}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900">
+                <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-[15px]">{tab === 'SCHEDULED' ? '出荷予定' : '出荷'}</p>
+                <p className="text-xs text-muted-foreground">{tab === 'SCHEDULED' ? '出荷の予定を登録' : '出荷を直接登録'}</p>
+              </div>
+            </button>
+            {/* 棚卸 or 棚卸予定 */}
+            <button
+              className="w-full flex items-center gap-4 rounded-2xl p-4 text-left bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 active:scale-[0.98] transition-all"
+              onClick={() => { setShowFab(false); navigate(`/transactions/new?type=IN&status=${tab}&category=棚卸`) }}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900">
+                <Package className="h-5 w-5 text-violet-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-[15px]">{tab === 'SCHEDULED' ? '棚卸予定' : '棚卸'}</p>
+                <p className="text-xs text-muted-foreground">{tab === 'SCHEDULED' ? '棚卸の予定を登録' : '棚卸を直接登録'}</p>
+              </div>
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* ソート・フィルター ダイアログ */}
       <Dialog open={showSortFilter} onOpenChange={setShowSortFilter}>

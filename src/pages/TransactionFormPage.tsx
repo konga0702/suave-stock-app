@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package, User, CalendarDays,
@@ -18,7 +18,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import type { Product, TransactionType, TransactionCategory } from '@/types/database'
+import type { Product, TransactionType, TransactionCategory, TransactionStatus } from '@/types/database'
 
 interface ItemRow {
   product_id: string
@@ -41,7 +41,13 @@ export function TransactionFormPage() {
   const [type, setType] = useState<TransactionType>(
     (searchParams.get('type') as TransactionType) || 'IN'
   )
-  const [category, setCategory] = useState<TransactionCategory>('入荷')
+  const [status, setStatus] = useState<TransactionStatus>(
+    (searchParams.get('status') as TransactionStatus) || 'SCHEDULED'
+  )
+  const [category, setCategory] = useState<TransactionCategory>(
+    (searchParams.get('category') as TransactionCategory) ||
+    ((searchParams.get('type') || 'IN') === 'IN' ? '入荷' : '出荷')
+  )
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [trackingNumber, setTrackingNumber] = useState('')
   const [orderCode, setOrderCode] = useState('')
@@ -76,6 +82,9 @@ export function TransactionFormPage() {
       if (!tx) return
 
       setType(tx.type as TransactionType)
+      if (tx.status === 'SCHEDULED' || tx.status === 'COMPLETED') {
+        setStatus(tx.status as TransactionStatus)
+      }
       setCategory(tx.category as TransactionCategory)
       setDate(tx.date)
       setTrackingNumber(tx.tracking_number ?? '')
@@ -110,8 +119,13 @@ export function TransactionFormPage() {
     load()
   }, [id])
 
-  // type変更時にcategoryリセット
+  // type変更時にcategoryリセット（初回マウント時はスキップ）
+  const isFirstRender = useRef(true)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     if (type === 'IN') setCategory('入荷')
     else setCategory('出荷')
   }, [type])
@@ -179,7 +193,7 @@ export function TransactionFormPage() {
 
       const txPayload = {
         type,
-        status: 'SCHEDULED' as const,
+        status: status,
         category,
         date,
         tracking_number: trackingNumber.trim() || null,
@@ -703,7 +717,7 @@ export function TransactionFormPage() {
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? '保存中...' : isEdit ? '更新する' : '予定として登録する'}
+          {saving ? '保存中...' : isEdit ? '更新する' : status === 'SCHEDULED' ? '予定として登録する' : '登録する'}
         </Button>
       </div>
     </div>

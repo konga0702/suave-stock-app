@@ -5,7 +5,7 @@ import { Package, ArrowLeftRight, LayoutDashboard, ScanSearch, TrendingUp } from
 const navItems = [
   { path: '/', label: 'ホーム', icon: LayoutDashboard },
   { path: '/products', label: '商品', icon: Package },
-  { path: '/transactions', label: '入出庫', icon: ArrowLeftRight },
+  { path: '/transactions', label: '作業', icon: ArrowLeftRight },
   { path: '/inventory', label: '追跡', icon: ScanSearch },
   { path: '/profit', label: '利益', icon: TrendingUp },
 ]
