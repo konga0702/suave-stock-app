@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,10 +46,17 @@ const sortOptions: { key: SortKey; label: string }[] = [
 ]
 
 export function TransactionsPage() {
+  const [searchParams] = useSearchParams()
   const [transactions, setTransactions] = useState<TxWithProducts[]>([])
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState('SCHEDULED')
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
+  const [tab, setTab] = useState(() => {
+    const s = searchParams.get('status')
+    return s === 'COMPLETED' || s === 'SCHEDULED' ? s : 'SCHEDULED'
+  })
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>(() => {
+    const t = searchParams.get('type')
+    return t === 'IN' || t === 'OUT' ? t : 'ALL'
+  })
 
   // ソート・フィルター
   const [sortKey, setSortKey] = useState<SortKey>('date_desc')

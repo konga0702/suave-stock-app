@@ -13,6 +13,8 @@ interface Stats {
   netStock: number
   scheduledIn: number
   scheduledOut: number
+  completedIn: number
+  completedOut: number
 }
 
 export function DashboardPage() {
@@ -21,14 +23,18 @@ export function DashboardPage() {
     netStock: 0,
     scheduledIn: 0,
     scheduledOut: 0,
+    completedIn: 0,
+    completedOut: 0,
   })
 
   useEffect(() => {
     async function loadStats() {
-      const [productsRes, scheduledInRes, scheduledOutRes] = await Promise.all([
+      const [productsRes, scheduledInRes, scheduledOutRes, completedInRes, completedOutRes] = await Promise.all([
         supabase.from('products').select('id', { count: 'exact', head: true }),
         supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'IN').eq('status', 'SCHEDULED'),
         supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'OUT').eq('status', 'SCHEDULED'),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'IN').eq('status', 'COMPLETED'),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('type', 'OUT').eq('status', 'COMPLETED'),
       ])
 
       // 純在庫数を計算: 入荷商品数 - 出荷商品数（COMPLETED取引の明細から集計）
@@ -52,6 +58,8 @@ export function DashboardPage() {
         netStock: totalIn - totalOut,
         scheduledIn: scheduledInRes.count ?? 0,
         scheduledOut: scheduledOutRes.count ?? 0,
+        completedIn: completedInRes.count ?? 0,
+        completedOut: completedOutRes.count ?? 0,
       })
     }
     loadStats()
@@ -83,7 +91,7 @@ export function DashboardPage() {
       iconBg: 'bg-sky-50 dark:bg-sky-950',
       iconColor: 'text-sky-500',
       valueColor: 'text-sky-600 dark:text-sky-400',
-      href: '/transactions?tab=IN',
+      href: '/transactions?status=SCHEDULED&type=IN',
     },
     {
       label: '出庫予定',
@@ -92,7 +100,25 @@ export function DashboardPage() {
       iconBg: 'bg-amber-50 dark:bg-amber-950',
       iconColor: 'text-amber-500',
       valueColor: 'text-amber-600 dark:text-amber-400',
-      href: '/transactions?tab=OUT',
+      href: '/transactions?status=SCHEDULED&type=OUT',
+    },
+    {
+      label: '入荷',
+      value: stats.completedIn,
+      icon: ArrowDownToLine,
+      iconBg: 'bg-sky-50/60 dark:bg-sky-950/60',
+      iconColor: 'text-sky-400',
+      valueColor: 'text-sky-500 dark:text-sky-400',
+      href: '/transactions?status=COMPLETED&type=IN',
+    },
+    {
+      label: '出荷',
+      value: stats.completedOut,
+      icon: ArrowUpFromLine,
+      iconBg: 'bg-amber-50/60 dark:bg-amber-950/60',
+      iconColor: 'text-amber-400',
+      valueColor: 'text-amber-500 dark:text-amber-400',
+      href: '/transactions?status=COMPLETED&type=OUT',
     },
   ]
 
