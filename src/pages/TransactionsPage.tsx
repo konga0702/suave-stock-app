@@ -218,7 +218,7 @@ export function TransactionsPage() {
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [filteredAndSorted.length, displayCount])
+  }, [displayCount])
 
   const handleImport = async () => {
     const input = document.createElement('input')
