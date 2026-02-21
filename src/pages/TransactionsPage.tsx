@@ -64,6 +64,7 @@ export function TransactionsPage() {
   // 無限スクロール
   const [displayCount, setDisplayCount] = useState(100)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const hasMoreRef = useRef(false)
 
   // 選択モード
   const [selectMode, setSelectMode] = useState(false)
@@ -82,26 +83,38 @@ export function TransactionsPage() {
 
   const load = useCallback(async () => {
     try {
-      // Step 1: transactions取得
-      const { data, error: txError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('status', tab)
-        .order('date', { ascending: false })
+      // Step 1: transactions全件取得（Supabaseデフォルト1000件制限をページングで回避）
+      const PAGE_SIZE = 1000
+      let allTxData: Transaction[] = []
+      let from = 0
 
-      if (txError) {
-        console.error('transactions error:', txError.message || String(txError))
-        setTransactions([])
-        return
+      while (true) {
+        const { data, error: txError } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('status', tab)
+          .order('date', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+
+        if (txError) {
+          console.error('transactions error:', txError.message || String(txError))
+          setTransactions([])
+          return
+        }
+
+        if (!data || data.length === 0) break
+        allTxData = [...allTxData, ...data]
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
       }
 
-      if (!data || data.length === 0) {
+      if (allTxData.length === 0) {
         setTransactions([])
         return
       }
 
       // Step 2: transaction_items取得（バッチ処理でSafari対応）
-      const txIds = data.map((tx) => tx.id)
+      const txIds = allTxData.map((tx) => tx.id)
       let itemsData: { transaction_id: string; product_id: string }[] = []
 
       if (txIds.length > 0) {
@@ -172,7 +185,7 @@ export function TransactionsPage() {
       }
 
       setTransactions(
-        data.map((tx) => {
+        allTxData.map((tx) => {
           const productInfo = txProductMap.get(tx.id)
           return {
             ...tx,
@@ -210,7 +223,7 @@ export function TransactionsPage() {
     if (!sentinel) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting && hasMoreRef.current) {
           setDisplayCount((prev) => prev + 100)
         }
       },
@@ -218,7 +231,8 @@ export function TransactionsPage() {
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [displayCount])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleImport = async () => {
     const input = document.createElement('input')
@@ -367,6 +381,7 @@ export function TransactionsPage() {
   // 無限スクロール用スライス
   const displayedTransactions = filteredAndSorted.slice(0, displayCount)
   const hasMore = displayCount < filteredAndSorted.length
+  hasMoreRef.current = hasMore
 
   // 選択モード
   const toggleSelectMode = () => {
