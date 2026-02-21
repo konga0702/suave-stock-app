@@ -852,21 +852,21 @@ export function TransactionsPage() {
                   <>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷&status=COMPLETED'); setShowActionSheet(false) }}
                     >
                       <ArrowDownToLine className="h-5 w-5 text-sky-500 shrink-0" />
                       <span className="text-base font-medium">入荷</span>
                     </button>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷&status=COMPLETED'); setShowActionSheet(false) }}
                     >
                       <ArrowUpFromLine className="h-5 w-5 text-rose-500 shrink-0" />
                       <span className="text-base font-medium">出荷</span>
                     </button>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸&status=COMPLETED'); setShowActionSheet(false) }}
                     >
                       <CheckSquare className="h-5 w-5 text-amber-500 shrink-0" />
                       <span className="text-base font-medium">棚卸</span>
@@ -876,21 +876,21 @@ export function TransactionsPage() {
                   <>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷&status=SCHEDULED'); setShowActionSheet(false) }}
                     >
                       <ArrowDownToLine className="h-5 w-5 text-sky-500 shrink-0" />
                       <span className="text-base font-medium">入荷予定</span>
                     </button>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷&status=SCHEDULED'); setShowActionSheet(false) }}
                     >
                       <ArrowUpFromLine className="h-5 w-5 text-rose-500 shrink-0" />
                       <span className="text-base font-medium">出荷予定</span>
                     </button>
                     <button
                       className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
-                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸'); setShowActionSheet(false) }}
+                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸&status=SCHEDULED'); setShowActionSheet(false) }}
                     >
                       <CheckSquare className="h-5 w-5 text-amber-500 shrink-0" />
                       <span className="text-base font-medium">棚卸予定</span>
