@@ -61,10 +61,8 @@ export function TransactionsPage() {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const exportAbortRef = useRef<AbortController | null>(null)
 
-  // 無限スクロール
+  // ページネーション（ボタン方式）
   const [displayCount, setDisplayCount] = useState(100)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
-  const hasMoreRef = useRef(false)
 
   // 選択モード
   const [selectMode, setSelectMode] = useState(false)
@@ -217,23 +215,6 @@ export function TransactionsPage() {
     setDisplayCount(100)
   }, [tab, search, typeFilter, categoryFilter, partnerFilter, sortKey])
 
-  // 無限スクロール: センチネル監視
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMoreRef.current) {
-          setDisplayCount((prev) => prev + 100)
-        }
-      },
-      { rootMargin: '200px' }
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const handleImport = async () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -378,10 +359,9 @@ export function TransactionsPage() {
     return result
   }, [transactions, typeFilter, search, categoryFilter, partnerFilter, sortKey])
 
-  // 無限スクロール用スライス
+  // ページネーション用スライス
   const displayedTransactions = filteredAndSorted.slice(0, displayCount)
   const hasMore = displayCount < filteredAndSorted.length
-  hasMoreRef.current = hasMore
 
   // 選択モード
   const toggleSelectMode = () => {
@@ -685,11 +665,9 @@ export function TransactionsPage() {
       {/* 件数表示 */}
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-muted-foreground">
-          {hasMore
-            ? `全${filteredAndSorted.length}件中${displayCount}件表示`
-            : filteredAndSorted.length === transactions.length
-              ? `${transactions.length}件`
-              : `${filteredAndSorted.length} / ${transactions.length}件`}
+          {filteredAndSorted.length === transactions.length
+            ? `${transactions.length}件`
+            : `${filteredAndSorted.length} / ${transactions.length}件`}
         </p>
       </div>
 
@@ -837,14 +815,18 @@ export function TransactionsPage() {
             })
           )}
 
-          {/* 無限スクロール: センチネル */}
-          {filteredAndSorted.length > 0 && (
-            <div ref={sentinelRef} className="py-4 flex justify-center">
-              {hasMore && (
-                <span className="text-[11px] text-muted-foreground animate-pulse">
-                  読み込み中...
-                </span>
-              )}
+          {/* さらに読み込みボタン */}
+          {hasMore && (
+            <div className="py-4 flex flex-col items-center gap-1.5">
+              <button
+                onClick={() => setDisplayCount((prev) => prev + 100)}
+                className="rounded-xl bg-muted/70 px-6 py-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-muted active:scale-95 transition-all"
+              >
+                さらに100件表示
+              </button>
+              <span className="text-[10px] text-muted-foreground/60">
+                全{filteredAndSorted.length}件中{displayCount}件表示
+              </span>
             </div>
           )}
 
