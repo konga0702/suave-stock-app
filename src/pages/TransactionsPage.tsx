@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, Upload, Download, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -67,6 +66,10 @@ export function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // アクションシート（＋ボタン）
+  const [showActionSheet, setShowActionSheet] = useState(false)
+  const navigate = useNavigate()
 
   const load = useCallback(async () => {
     // Step 1: transactions取得
@@ -366,7 +369,7 @@ export function TransactionsPage() {
         </div>
       )}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">入出庫</h1>
+        <h1 className="text-xl font-bold tracking-tight">作業</h1>
         <div className="flex gap-1.5">
           {!selectMode ? (
             <>
@@ -386,7 +389,7 @@ export function TransactionsPage() {
               >
                 {exportProgress && exportProgress.phase !== 'done'
                   ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  : <Download className="h-4 w-4" />
+                  : <ClipboardList className="h-4 w-4" />
                 }
               </Button>
               <Button
@@ -397,11 +400,6 @@ export function TransactionsPage() {
                 title="選択モード"
               >
                 <CheckSquare className="h-4 w-4" />
-              </Button>
-              <Button asChild size="icon" className="h-9 w-9 rounded-xl bg-slate-800 text-white shadow-sm hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all">
-                <Link to="/transactions/new">
-                  <Plus className="h-4 w-4" />
-                </Link>
               </Button>
             </>
           ) : (
@@ -535,8 +533,8 @@ export function TransactionsPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full rounded-xl bg-muted/50 p-1">
-          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">予定</TabsTrigger>
-          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">履歴</TabsTrigger>
+          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業予定</TabsTrigger>
+          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業履歴</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-4 space-y-2">
           {filteredAndSorted.length === 0 ? (
@@ -560,148 +558,116 @@ export function TransactionsPage() {
               return selectMode ? (
                 <Card
                   key={tx.id}
-                  className={`mb-2 border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md ${
-                    index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-                  } ${selectedIds.has(tx.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20' : ''}`}
+                  className={`mb-2 border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md ${
+                    selectedIds.has(tx.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20 border-sky-300' : 'bg-white dark:bg-white/[0.03]'
+                  }`}
                   onClick={() => toggleSelect(tx.id)}
                 >
-                  <CardContent className="flex items-center gap-3.5 p-4">
-                    {/* チェックボックス */}
-                    <div className="shrink-0">
-                      {selectedIds.has(tx.id) ? (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500 text-white">
-                          <CheckSquare className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-border/60">
-                          <Square className="h-4 w-4 text-transparent" />
-                        </div>
-                      )}
-                    </div>
-                    {/* 商品画像 or タイプアイコン */}
-                    {tx.firstProductImage ? (
-                      <div className={`relative h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
-                        isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
-                      }`}>
-                        <img src={tx.firstProductImage} alt="" className="h-full w-full object-cover" />
-                        <div className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full ${
-                          isIN ? 'bg-sky-500' : 'bg-amber-500'
-                        }`}>
-                          {isIN ? (
-                            <ArrowDownToLine className="h-2.5 w-2.5 text-white" />
-                          ) : (
-                            <ArrowUpFromLine className="h-2.5 w-2.5 text-white" />
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded ${
-                        isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
-                      }`}>
-                        {isIN ? (
-                          <ArrowDownToLine className="h-5 w-5 text-sky-500" />
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      {/* チェックボックス */}
+                      <div className="shrink-0 mt-0.5">
+                        {selectedIds.has(tx.id) ? (
+                          <div className="flex h-5 w-5 items-center justify-center rounded bg-sky-500 text-white">
+                            <CheckSquare className="h-3.5 w-3.5" />
+                          </div>
                         ) : (
-                          <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
+                          <div className="flex h-5 w-5 items-center justify-center rounded border-2 border-border/60">
+                            <Square className="h-3.5 w-3.5 text-transparent" />
+                          </div>
                         )}
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      {tx.firstProductName && (
-                        <p className="text-[13px] font-bold truncate">
-                          {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
-                        </p>
-                      )}
-                      {tx.firstProductCode && (
-                        <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.firstProductCode}</p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
-                          isIN
-                            ? 'bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900 dark:text-sky-300'
-                            : 'bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-300'
-                        }`}>
-                          {isIN ? '入庫' : '出庫'}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-md border-border/60">{tx.category}</Badge>
-                        <span className="text-[11px] text-muted-foreground">{tx.date}</span>
+                      <div className="flex-1 min-w-0">
+                        {/* ヘッダー行 */}
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            {isIN ? (
+                              <ArrowDownToLine className="h-[18px] w-[18px] shrink-0 text-sky-500" />
+                            ) : (
+                              <ArrowUpFromLine className="h-[18px] w-[18px] shrink-0 text-rose-500" />
+                            )}
+                            <span className={`text-[13px] font-bold ${
+                              isIN ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {tab === 'SCHEDULED'
+                                ? (isIN ? '入荷予定' : '出荷予定')
+                                : (isIN ? '入荷' : '出荷')
+                              }{' '}{tx.date}
+                            </span>
+                          </div>
+                          {(tx.itemCount ?? 0) > 0 && (
+                            <div className="flex flex-col items-end leading-none shrink-0 ml-2">
+                              <span className={`text-sm font-bold ${isIN ? 'text-sky-500' : 'text-rose-500'}`}>+{tx.itemCount}</span>
+                              <span className="text-[10px] text-muted-foreground">/1</span>
+                            </div>
+                          )}
+                        </div>
+                        {tx.partner_name && <p className="text-[12px] text-muted-foreground mb-0.5 truncate">{tx.partner_name}</p>}
+                        {tx.firstProductName && (
+                          <p className="text-[13px] font-medium mb-0.5 leading-snug line-clamp-2">{tx.firstProductName}</p>
+                        )}
+                        {tx.order_date && <p className="text-[11px] text-muted-foreground">注文日: {tx.order_date.replace(/-/g, '/')}</p>}
+                        {tx.order_code && <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.order_code}</p>}
                       </div>
-                    </div>
-                    <div className={`shrink-0 text-right font-bold num-display text-[15px] ${
-                      isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
-                    }`}>
-                      ¥{Number(tx.total_amount).toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
               ) : (
                 <Link key={tx.id} to={`/transactions/${tx.id}`}>
-                  <Card className={`mb-2 border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-                    index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-                  }`}>
-                    <CardContent className="flex items-center gap-3.5 p-4">
-                      {/* 商品画像 or タイプアイコン */}
-                      {tx.firstProductImage ? (
-                        <div className={`relative h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
-                          isIN ? 'border-sky-200 dark:border-sky-800' : 'border-amber-200 dark:border-amber-800'
-                        }`}>
-                          <img src={tx.firstProductImage} alt="" className="h-full w-full object-cover" />
-                          <div className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full ${
-                            isIN ? 'bg-sky-500' : 'bg-amber-500'
-                          }`}>
-                            {isIN ? (
-                              <ArrowDownToLine className="h-2.5 w-2.5 text-white" />
-                            ) : (
-                              <ArrowUpFromLine className="h-2.5 w-2.5 text-white" />
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded ${
-                          isIN ? 'bg-sky-50 dark:bg-sky-950' : 'bg-amber-50 dark:bg-amber-950'
-                        }`}>
+                  <Card className="mb-2 border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white dark:bg-white/[0.03]">
+                    <CardContent className="p-4">
+                      {/* ヘッダー行: アイコン + タイプ+日付 + 件数バッジ */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
                           {isIN ? (
-                            <ArrowDownToLine className="h-5 w-5 text-sky-500" />
+                            <ArrowDownToLine className="h-[18px] w-[18px] shrink-0 text-sky-500" />
                           ) : (
-                            <ArrowUpFromLine className="h-5 w-5 text-amber-500" />
+                            <ArrowUpFromLine className="h-[18px] w-[18px] shrink-0 text-rose-500" />
                           )}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {/* 商品名を太字で目立つように表示 */}
-                        {tx.firstProductName && (
-                          <p className="text-[13px] font-bold truncate">
-                            {tx.firstProductName}{(tx.itemCount ?? 0) > 1 ? <span className="text-[11px] font-normal text-muted-foreground ml-1">他{(tx.itemCount ?? 0) - 1}件</span> : ''}
-                          </p>
-                        )}
-                        {tx.firstProductCode && (
-                          <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.firstProductCode}</p>
-                        )}
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Badge className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
-                            isIN
-                              ? 'bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900 dark:text-sky-300'
-                              : 'bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-300'
+                          <span className={`text-[13px] font-bold ${
+                            isIN ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'
                           }`}>
-                            {isIN ? '入庫' : '出庫'}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-md border-border/60">{tx.category}</Badge>
-                          <span className="text-[11px] text-muted-foreground">{tx.date}</span>
+                            {tab === 'SCHEDULED'
+                              ? (isIN ? '入荷予定' : '出荷予定')
+                              : (isIN ? '入荷' : '出荷')
+                            }{' '}{tx.date}
+                          </span>
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                          {tx.partner_name && <span className="truncate">{tx.partner_name}</span>}
-                          {tx.partner_name && tx.tracking_number && <span className="opacity-40">·</span>}
-                          {tx.tracking_number && (
-                            <span className="truncate font-mono text-[10px] text-muted-foreground/50">
-                              {tx.tracking_number}
+                        {(tx.itemCount ?? 0) > 0 && (
+                          <div className="flex flex-col items-end leading-none shrink-0 ml-2">
+                            <span className={`text-sm font-bold ${isIN ? 'text-sky-500' : 'text-rose-500'}`}>
+                              +{tx.itemCount}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">/1</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* 取引先名 */}
+                      {tx.partner_name && (
+                        <p className="text-[12px] text-muted-foreground mb-1 truncate">{tx.partner_name}</p>
+                      )}
+                      {/* 商品名 */}
+                      {tx.firstProductName && (
+                        <p className="text-[13px] font-medium mb-1 leading-snug line-clamp-2">
+                          {tx.firstProductName}
+                          {(tx.itemCount ?? 0) > 1 && (
+                            <span className="text-[11px] text-muted-foreground font-normal">
+                              {', '}{tx.firstProductCode && <span className="font-mono">{tx.firstProductCode}</span>}
                             </span>
                           )}
-                        </div>
-                      </div>
-                      <div className={`shrink-0 text-right font-bold num-display text-[15px] ${
-                        isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
-                      }`}>
-                        ¥{Number(tx.total_amount).toLocaleString()}
-                      </div>
+                        </p>
+                      )}
+                      {/* 注文日 */}
+                      {tx.order_date && (
+                        <p className="text-[11px] text-muted-foreground">注文日: {tx.order_date.replace(/-/g, '/')}</p>
+                      )}
+                      {/* 管理番号 */}
+                      {tx.order_code && (
+                        <p className="font-mono text-[11px] text-muted-foreground/70 truncate mt-0.5">{tx.order_code}</p>
+                      )}
+                      {tx.tracking_number && (
+                        <p className="font-mono text-[11px] text-muted-foreground/60 truncate">{tx.tracking_number}</p>
+                      )}
                     </CardContent>
                   </Card>
                 </Link>
@@ -710,6 +676,17 @@ export function TransactionsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* フローティング＋ボタン（選択モードでない時） */}
+      {!selectMode && (
+        <button
+          className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-500/30 transition-all hover:bg-sky-600 active:scale-95"
+          onClick={() => setShowActionSheet(true)}
+          aria-label="新規作業を追加"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
       {/* 選択モード時のフローティング削除バー */}
       {selectMode && selectedIds.size > 0 && (
@@ -727,6 +704,76 @@ export function TransactionsPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* アクションシート（作業種別選択） */}
+      {showActionSheet && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm"
+            onClick={() => setShowActionSheet(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl bg-white dark:bg-slate-900 shadow-2xl">
+            <div className="mx-auto max-w-lg">
+              {/* ドラッグバー */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-700" />
+              </div>
+              <div className="px-4 pb-4 pt-1 space-y-1">
+                {tab === 'COMPLETED' ? (
+                  <>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷'); setShowActionSheet(false) }}
+                    >
+                      <ArrowDownToLine className="h-5 w-5 text-sky-500 shrink-0" />
+                      <span className="text-base font-medium">入荷</span>
+                    </button>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷'); setShowActionSheet(false) }}
+                    >
+                      <ArrowUpFromLine className="h-5 w-5 text-rose-500 shrink-0" />
+                      <span className="text-base font-medium">出荷</span>
+                    </button>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸'); setShowActionSheet(false) }}
+                    >
+                      <CheckSquare className="h-5 w-5 text-amber-500 shrink-0" />
+                      <span className="text-base font-medium">棚卸</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=IN&category=入荷'); setShowActionSheet(false) }}
+                    >
+                      <ArrowDownToLine className="h-5 w-5 text-sky-500 shrink-0" />
+                      <span className="text-base font-medium">入荷予定</span>
+                    </button>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=OUT&category=出荷'); setShowActionSheet(false) }}
+                    >
+                      <ArrowUpFromLine className="h-5 w-5 text-rose-500 shrink-0" />
+                      <span className="text-base font-medium">出荷予定</span>
+                    </button>
+                    <button
+                      className="w-full flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100"
+                      onClick={() => { navigate('/transactions/new?type=IN&category=棚卸'); setShowActionSheet(false) }}
+                    >
+                      <CheckSquare className="h-5 w-5 text-amber-500 shrink-0" />
+                      <span className="text-base font-medium">棚卸予定</span>
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="h-[env(safe-area-inset-bottom)]" />
+            </div>
+          </div>
+        </>
       )}
 
       {/* 一括削除確認ダイアログ */}
