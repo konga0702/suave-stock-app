@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, ArrowLeftRight, LayoutDashboard, ScanSearch, TrendingUp } from 'lucide-react'
+import { Package, ArrowLeftRight, LayoutDashboard, Boxes, TrendingUp } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: 'ホーム', icon: LayoutDashboard },
   { path: '/products', label: '商品', icon: Package },
   { path: '/transactions', label: '作業', icon: ArrowLeftRight },
-  { path: '/inventory', label: '追跡', icon: ScanSearch },
+  { path: '/inventory', label: '在庫', icon: Boxes },
   { path: '/profit', label: '利益', icon: TrendingUp },
 ]
 

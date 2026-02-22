@@ -1,342 +1,358 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Search, X, Package, ArrowUpFromLine, BoxSelect, Tag, Download, CheckSquare, Square, Trash2 } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { BarcodeScanButton } from '@/components/BarcodeScanButton'
+  Package, ArrowDownToLine, ArrowUpFromLine, Search, X, ArrowUpDown, Filter,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
-import { exportInventoryCsv } from '@/lib/csv'
-import { toast } from 'sonner'
-import type { InventoryItem } from '@/types/database'
+
+interface NetStockRow {
+  product_id: string
+  product_name: string
+  product_code: string
+  product_image: string | null
+  totalIn: number
+  totalOut: number
+  netStock: number
+}
+
+type SortKey = 'name_asc' | 'name_desc' | 'net_desc' | 'net_asc' | 'in_desc' | 'out_desc'
+type StockFilter = 'all' | 'positive' | 'negative' | 'zero' | 'has_in' | 'has_out'
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'name_asc', label: '商品名 A→Z' },
+  { key: 'name_desc', label: '商品名 Z→A' },
+  { key: 'net_desc', label: '純在庫 多い順' },
+  { key: 'net_asc', label: '純在庫 少ない順' },
+  { key: 'in_desc', label: '入庫数 多い順' },
+  { key: 'out_desc', label: '出庫数 多い順' },
+]
+
+const FILTER_OPTIONS: { key: StockFilter; label: string }[] = [
+  { key: 'all', label: 'すべて' },
+  { key: 'positive', label: 'プラス在庫' },
+  { key: 'negative', label: 'マイナス在庫' },
+  { key: 'zero', label: 'ゼロ在庫' },
+  { key: 'has_in', label: '入庫あり' },
+  { key: 'has_out', label: '出庫あり' },
+]
 
 export function InventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>([])
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<NetStockRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState('IN_STOCK')
-  const [selectMode, setSelectMode] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  const load = useCallback(async () => {
-    let query = supabase
-      .from('inventory_items')
-      .select('*, product:products(name, image_url)')
-      .order('created_at', { ascending: false })
-
-    if (tab !== 'ALL') {
-      query = query.eq('status', tab)
-    }
-
-    const { data } = await query
-    if (data) {
-      setItems(data.map((item) => ({
-        ...item,
-        product: item.product as InventoryItem['product'],
-      })))
-    }
-  }, [tab])
+  const [sortKey, setSortKey] = useState<SortKey>('net_desc')
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all')
+  const [showSortPanel, setShowSortPanel] = useState(false)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
 
   useEffect(() => {
+    async function load() {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, product_code, image_url')
+        .order('name')
+
+      if (!products) { setLoading(false); return }
+
+      const [{ data: inItems }, { data: outItems }] = await Promise.all([
+        supabase
+          .from('transaction_items')
+          .select('product_id, quantity, transaction:transactions!inner(type, status)')
+          .eq('transaction.type' as string, 'IN')
+          .eq('transaction.status' as string, 'COMPLETED'),
+        supabase
+          .from('transaction_items')
+          .select('product_id, quantity, transaction:transactions!inner(type, status)')
+          .eq('transaction.type' as string, 'OUT')
+          .eq('transaction.status' as string, 'COMPLETED'),
+      ])
+
+      const inMap = new Map<string, number>()
+      const outMap = new Map<string, number>()
+      for (const item of inItems ?? []) {
+        inMap.set(item.product_id, (inMap.get(item.product_id) ?? 0) + (item.quantity ?? 0))
+      }
+      for (const item of outItems ?? []) {
+        outMap.set(item.product_id, (outMap.get(item.product_id) ?? 0) + (item.quantity ?? 0))
+      }
+
+      const result: NetStockRow[] = products.map((p) => {
+        const totalIn = inMap.get(p.id) ?? 0
+        const totalOut = outMap.get(p.id) ?? 0
+        return {
+          product_id: p.id,
+          product_name: p.name,
+          product_code: p.product_code ?? '',
+          product_image: p.image_url ?? null,
+          totalIn,
+          totalOut,
+          netStock: totalIn - totalOut,
+        }
+      })
+
+      setRows(result)
+      setLoading(false)
+    }
     load()
-  }, [load])
+  }, [])
 
-  // タブ変更時に選択モードをリセット
-  useEffect(() => {
-    setSelectMode(false)
-    setSelected(new Set())
-  }, [tab])
-
-  const filtered = items.filter((item) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      item.product?.name?.toLowerCase().includes(q) ||
-      item.tracking_number?.toLowerCase().includes(q) ||
-      item.order_code?.toLowerCase().includes(q) ||
-      item.shipping_code?.toLowerCase().includes(q) ||
-      item.partner_name?.toLowerCase().includes(q) ||
-      item.memo?.toLowerCase().includes(q)
-    )
-  })
-
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const processedRows = useMemo(() => {
+    let result = rows.filter((r) => {
+      if (!search) return true
+      const q = search.toLowerCase()
+      return r.product_name.toLowerCase().includes(q) || r.product_code.toLowerCase().includes(q)
     })
-  }
 
-  const toggleSelectAll = () => {
-    if (selected.size === filtered.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(filtered.map((i) => i.id)))
+    switch (stockFilter) {
+      case 'positive': result = result.filter((r) => r.netStock > 0); break
+      case 'negative': result = result.filter((r) => r.netStock < 0); break
+      case 'zero':     result = result.filter((r) => r.netStock === 0); break
+      case 'has_in':   result = result.filter((r) => r.totalIn > 0); break
+      case 'has_out':  result = result.filter((r) => r.totalOut > 0); break
     }
-  }
 
-  const handleBulkDelete = async () => {
-    if (selected.size === 0) return
-    setDeleting(true)
-    try {
-      const ids = Array.from(selected)
-      const { error } = await supabase
-        .from('inventory_items')
-        .delete()
-        .in('id', ids)
-      if (error) throw error
-      toast.success(`${ids.length}件の個体データを削除しました`)
-      setSelected(new Set())
-      setSelectMode(false)
-      load()
-    } catch {
-      toast.error('削除に失敗しました')
-    } finally {
-      setDeleting(false)
-      setShowDeleteDialog(false)
-    }
-  }
+    return [...result].sort((a, b) => {
+      switch (sortKey) {
+        case 'name_asc':  return a.product_name.localeCompare(b.product_name, 'ja')
+        case 'name_desc': return b.product_name.localeCompare(a.product_name, 'ja')
+        case 'net_desc':  return b.netStock - a.netStock
+        case 'net_asc':   return a.netStock - b.netStock
+        case 'in_desc':   return b.totalIn - a.totalIn
+        case 'out_desc':  return b.totalOut - a.totalOut
+        default:          return 0
+      }
+    })
+  }, [rows, search, stockFilter, sortKey])
 
-  const exitSelectMode = () => {
-    setSelectMode(false)
-    setSelected(new Set())
-  }
+  // 全商品合計（ダッシュボードと一致させる）
+  const totalIn  = rows.reduce((s, r) => s + r.totalIn, 0)
+  const totalOut = rows.reduce((s, r) => s + r.totalOut, 0)
+  const totalNetStock = totalIn - totalOut
+
+  const activeSortLabel = SORT_OPTIONS.find((o) => o.key === sortKey)?.label
+  const activeFilterLabel = FILTER_OPTIONS.find((o) => o.key === stockFilter)?.label
 
   return (
-    <div className="page-transition space-y-5">
+    <div className="page-transition space-y-4">
+      {/* ヘッダー */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">個体追跡</h1>
-        <div className="flex items-center gap-1.5">
-          <Badge className={`rounded-xl px-3 py-1 font-semibold border-0 ${
-            tab === 'IN_STOCK'
-              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300'
-              : tab === 'SHIPPED'
-                ? 'bg-slate-100 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400'
-                : 'bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900 dark:text-violet-300'
-          }`}>
-            {filtered.length}件
-          </Badge>
-          {!selectMode ? (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
-                onClick={() => setSelectMode(true)}
-                title="選択モード"
-              >
-                <CheckSquare className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
-                onClick={() => exportInventoryCsv(filtered)}
-                title="CSVエクスポート"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl text-xs"
-              onClick={exitSelectMode}
-            >
-              キャンセル
-            </Button>
-          )}
-        </div>
+        <h1 className="text-xl font-bold tracking-tight">在庫</h1>
+        <p className="text-xs text-muted-foreground">{rows.length}商品</p>
       </div>
 
-      {/* 選択モード: 全選択・削除バー */}
-      {selectMode && (
-        <div className="flex items-center justify-between rounded-2xl bg-slate-100 dark:bg-slate-800 p-3">
-          <button
-            type="button"
-            onClick={toggleSelectAll}
-            className="flex items-center gap-2 text-sm font-medium"
-          >
-            {selected.size === filtered.length && filtered.length > 0 ? (
-              <CheckSquare className="h-4 w-4 text-violet-500" />
-            ) : (
-              <Square className="h-4 w-4 text-muted-foreground" />
-            )}
-            全選択 ({selected.size}/{filtered.length})
-          </button>
+      {/* サマリーカード（ダッシュボードと同じ計算） */}
+      <div className="grid grid-cols-3 gap-2">
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-3 text-center">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <ArrowDownToLine className="h-3 w-3 text-sky-500" />
+              <p className="text-[10px] font-medium text-muted-foreground">総入庫</p>
+            </div>
+            <p className="text-xl font-bold num-display text-sky-600 dark:text-sky-400">{totalIn}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="p-3 text-center">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <ArrowUpFromLine className="h-3 w-3 text-amber-500" />
+              <p className="text-[10px] font-medium text-muted-foreground">総出庫</p>
+            </div>
+            <p className="text-xl font-bold num-display text-amber-600 dark:text-amber-400">{totalOut}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none bg-emerald-50/60 dark:bg-emerald-950/30">
+          <CardContent className="p-3 text-center">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <Package className="h-3 w-3 text-emerald-500" />
+              <p className="text-[10px] font-medium text-muted-foreground">純在庫</p>
+            </div>
+            <p className="text-xl font-bold num-display text-emerald-600 dark:text-emerald-400">{totalNetStock}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 検索バー */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="商品名・商品コードで検索..."
+          inputMode="text"
+          enterKeyHint="done"
+          className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60"
+        />
+        {search && (
           <Button
-            variant="destructive"
-            size="sm"
-            className="rounded-xl text-xs gap-1.5"
-            disabled={selected.size === 0}
-            onClick={() => setShowDeleteDialog(true)}
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
+            onClick={() => setSearch('')}
           >
-            <Trash2 className="h-3 w-3" />
-            {selected.size}件を削除
+            <X className="h-3.5 w-3.5" />
           </Button>
+        )}
+      </div>
+
+      {/* ソート・フィルターボタン */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`rounded-xl text-xs gap-1.5 ${sortKey !== 'net_desc' ? 'border-sky-400 bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300' : ''}`}
+          onClick={() => { setShowSortPanel((v) => !v); setShowFilterPanel(false) }}
+        >
+          <ArrowUpDown className="h-3 w-3" />
+          {activeSortLabel ?? '並び替え'}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`rounded-xl text-xs gap-1.5 ${stockFilter !== 'all' ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300' : ''}`}
+          onClick={() => { setShowFilterPanel((v) => !v); setShowSortPanel(false) }}
+        >
+          <Filter className="h-3 w-3" />
+          {activeFilterLabel ?? '絞り込み'}
+        </Button>
+        {(sortKey !== 'net_desc' || stockFilter !== 'all') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-xl text-xs text-muted-foreground hover:text-foreground ml-auto"
+            onClick={() => { setSortKey('net_desc'); setStockFilter('all') }}
+          >
+            <X className="h-3 w-3 mr-1" />クリア
+          </Button>
+        )}
+      </div>
+
+      {/* ソートパネル */}
+      {showSortPanel && (
+        <div className="flex flex-wrap gap-1.5">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => { setSortKey(opt.key); setShowSortPanel(false) }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
+                sortKey === opt.key
+                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       )}
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-          <Input
-            placeholder="管理番号・商品名・コードで検索"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            inputMode="text"
-            enterKeyHint="done"
-            className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60"
-          />
-          {search && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
-              onClick={() => setSearch('')}
+      {/* フィルターパネル */}
+      {showFilterPanel && (
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => { setStockFilter(opt.key); setShowFilterPanel(false) }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
+                stockFilter === opt.key
+                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+              }`}
             >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          )}
+              {opt.label}
+            </button>
+          ))}
         </div>
-        <BarcodeScanButton onScan={(barcode) => setSearch(barcode)} />
-      </div>
+      )}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full rounded-xl bg-muted/50 p-1">
-          <TabsTrigger value="IN_STOCK" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">
-            <Package className="mr-1 h-3 w-3" />
-            入荷済
-          </TabsTrigger>
-          <TabsTrigger value="SHIPPED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">
-            <ArrowUpFromLine className="mr-1 h-3 w-3" />
-            出荷済
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value={tab} className="mt-4 space-y-2">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-                <BoxSelect className="h-7 w-7 text-muted-foreground/40" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {search
-                  ? '検索結果がありません'
-                  : tab === 'IN_STOCK'
-                    ? '入荷済の個体はありません'
-                    : '出荷済みの個体はありません'}
-              </p>
-            </div>
-          ) : (
-            filtered.map((item, index) => (
-              <Card
-                key={item.id}
-                className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md ${
-                  index % 2 === 1 ? 'bg-slate-50/50 dark:bg-white/[0.02]' : ''
-                } ${selectMode && selected.has(item.id) ? 'ring-2 ring-violet-400 dark:ring-violet-500' : ''}`}
-                onClick={selectMode ? () => toggleSelect(item.id) : undefined}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3.5">
-                    {/* 選択モード: チェックボックス */}
-                    {selectMode && (
-                      <div className="mt-1 shrink-0">
-                        {selected.has(item.id) ? (
-                          <CheckSquare className="h-5 w-5 text-violet-500" />
-                        ) : (
-                          <Square className="h-5 w-5 text-muted-foreground/40" />
-                        )}
-                      </div>
+      {/* 件数 */}
+      <p className="text-xs text-muted-foreground">
+        {processedRows.length === rows.length
+          ? `${rows.length}件の商品`
+          : `${processedRows.length} / ${rows.length}件を表示`}
+      </p>
+
+      {/* 商品一覧 */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        </div>
+      ) : processedRows.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+            <Package className="h-7 w-7 text-muted-foreground/40" />
+          </div>
+          <p className="text-sm text-muted-foreground">該当する商品がありません</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {processedRows.map((row) => (
+            <Card
+              key={row.product_id}
+              className="border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer bg-white dark:bg-white/[0.03]"
+              onClick={() => navigate(`/inventory/${row.product_id}`)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  {/* 商品画像 */}
+                  {row.product_image ? (
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border/40">
+                      <img src={row.product_image} alt={row.product_name} className="h-full w-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                      <Package className="h-6 w-6 text-slate-400" />
+                    </div>
+                  )}
+
+                  {/* 商品名・コード */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold leading-snug truncate">{row.product_name}</p>
+                    {row.product_code && (
+                      <p className="font-mono text-xs text-muted-foreground/70 truncate mt-0.5">{row.product_code}</p>
                     )}
-                    {item.product?.image_url ? (
-                      <div className={`mt-0.5 h-11 w-11 shrink-0 overflow-hidden rounded border-2 ${
-                        item.status === 'IN_STOCK' ? 'border-violet-200 dark:border-violet-800' : 'border-slate-200 dark:border-slate-700'
-                      }`}>
-                        <img src={item.product.image_url} alt={item.product.name} className="h-full w-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded ${
-                        item.status === 'IN_STOCK' ? 'bg-violet-50 dark:bg-violet-950' : 'bg-slate-100 dark:bg-slate-800'
-                      }`}>
-                        {item.status === 'IN_STOCK' ? (
-                          <Tag className="h-5 w-5 text-violet-500" />
-                        ) : (
-                          <ArrowUpFromLine className="h-5 w-5 text-slate-400" />
-                        )}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[13px] font-bold truncate">
-                          {item.product?.name ?? '不明な商品'}
-                        </p>
-                        <Badge className={`shrink-0 text-[10px] px-2 py-0.5 rounded-md font-semibold border-0 ${
-                          item.status === 'IN_STOCK'
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400'
-                        }`}>
-                          {item.status === 'IN_STOCK' ? '入荷済' : '出荷済'}
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 font-mono text-[11px] text-violet-500 truncate">
-                        {item.tracking_number}
-                      </p>
-                      {(item.order_code || item.shipping_code) && (
-                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground/60 font-mono">
-                          {item.order_code && <span>注文: {item.order_code}</span>}
-                          {item.shipping_code && <span>追跡: {item.shipping_code}</span>}
-                        </div>
-                      )}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <span className="rounded-lg bg-muted px-2 py-0.5">入庫: {item.in_date}</span>
-                        {item.out_date && <span className="rounded-lg bg-muted px-2 py-0.5">出荷: {item.out_date}</span>}
-                        {item.partner_name && <span className="rounded-lg bg-muted px-2 py-0.5">{item.partner_name}</span>}
-                      </div>
+                  </div>
+
+                  {/* 入庫・出庫・純在庫 */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-center">
+                      <p className="text-[9px] font-medium text-muted-foreground/60 mb-0.5">入庫</p>
+                      <p className="text-sm font-bold num-display text-sky-600 dark:text-sky-400">{row.totalIn}</p>
+                    </div>
+                    <div className="h-7 w-px bg-border/40" />
+                    <div className="text-center">
+                      <p className="text-[9px] font-medium text-muted-foreground/60 mb-0.5">出庫</p>
+                      <p className="text-sm font-bold num-display text-amber-600 dark:text-amber-400">{row.totalOut}</p>
+                    </div>
+                    <div className="h-7 w-px bg-border/40" />
+                    <div className={`text-center min-w-[44px] rounded-xl px-2 py-1.5 ${
+                      row.netStock > 0
+                        ? 'bg-emerald-50 dark:bg-emerald-950/50'
+                        : row.netStock < 0
+                          ? 'bg-rose-50 dark:bg-rose-950/50'
+                          : 'bg-slate-100 dark:bg-slate-800/50'
+                    }`}>
+                      <p className="text-[9px] font-medium text-muted-foreground/60 mb-0.5">純在庫</p>
+                      <p className={`text-sm font-bold num-display ${
+                        row.netStock > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : row.netStock < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-slate-500'
+                      }`}>{row.netStock}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* 削除確認ダイアログ */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>個体データを削除しますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              選択した{selected.size}件の個体追跡データを削除します。この操作は取り消せません。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBulkDelete}
-              className="bg-rose-500 hover:bg-rose-600 rounded-xl"
-              disabled={deleting}
-            >
-              {deleting ? '削除中...' : `${selected.size}件を削除`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
