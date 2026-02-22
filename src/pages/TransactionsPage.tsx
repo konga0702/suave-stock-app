@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck, ChevronDown, Calendar, Package } from 'lucide-react'
+import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck, ChevronDown, Calendar, Package, DatabaseBackup } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { supabase } from '@/lib/supabase'
 import { exportTransactionsDetailCsvWithFilters, importTransactionsCsv, downloadTransactionsTemplate } from '@/lib/csv'
 import type { ExportProgress } from '@/lib/csv'
@@ -393,6 +400,38 @@ export function TransactionsPage() {
     }
   }, [exportProgress, tab, typeFilter, categoryFilter, partnerFilter, search])
 
+  // CSVエクスポート（全件：予定＋履歴）
+  const handleExportAll = useCallback(async () => {
+    if (exportProgress) return
+    const controller = new AbortController()
+    exportAbortRef.current = controller
+    try {
+      await exportTransactionsDetailCsvWithFilters(
+        {
+          // status を渡さない → 全件（予定＋履歴）
+          type: typeFilter !== 'ALL' ? typeFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          partnerName: partnerFilter !== 'all' ? partnerFilter : undefined,
+          search: search || undefined,
+        },
+        (progress) => setExportProgress(progress),
+        controller.signal,
+      )
+      setExportProgress(null)
+      toast.success('全件CSVをエクスポートしました（予定＋履歴）')
+    } catch (err: unknown) {
+      setExportProgress(null)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        toast.info('エクスポートをキャンセルしました')
+      } else {
+        const msg = err instanceof Error ? err.message : 'エクスポートに失敗しました'
+        toast.error(msg)
+      }
+    } finally {
+      exportAbortRef.current = null
+    }
+  }, [exportProgress, typeFilter, categoryFilter, partnerFilter, search])
+
   const handleExportCancel = useCallback(() => {
     exportAbortRef.current?.abort()
   }, [])
@@ -633,19 +672,36 @@ export function TransactionsPage() {
               <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors" onClick={handleImport} title="CSVインポート">
                 <Upload className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
-                onClick={handleExport}
-                disabled={!!exportProgress}
-                title="CSVエクスポート（全件）"
-              >
-                {exportProgress && exportProgress.phase !== 'done'
-                  ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  : <ClipboardList className="h-4 w-4" />
-                }
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl border-border/60 hover:bg-accent transition-colors"
+                    disabled={!!exportProgress}
+                    title="CSVエクスポート"
+                  >
+                    {exportProgress && exportProgress.phase !== 'done'
+                      ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      : <ClipboardList className="h-4 w-4" />
+                    }
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={handleExport} className="gap-2">
+                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                    <span>現在のタブのみ</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      {tab === 'COMPLETED' ? '作業履歴' : '作業予定'}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportAll} className="gap-2">
+                    <DatabaseBackup className="h-4 w-4 text-muted-foreground" />
+                    <span>全件（予定＋履歴）</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="outline"
                 size="icon"
