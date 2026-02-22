@@ -539,26 +539,30 @@ export function TransactionFormPage() {
                       className="h-7 rounded-lg text-[11px] font-mono bg-white dark:bg-white/5 border-border/60 px-2"
                     />
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                      className="h-8 w-14 rounded-lg text-center text-sm bg-white dark:bg-white/5 border-border/60"
-                    />
-                    <span className="text-xs text-muted-foreground">×</span>
-                    <div className="flex items-center gap-1">
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[11px] text-muted-foreground">個数</span>
                       <Input
-                        type="number"
+                        type="text"
                         inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        className="h-11 w-full rounded-xl text-center text-base font-semibold bg-white dark:bg-white/5 border-border/60"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[11px] text-muted-foreground">{priceLabel}</span>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={item.price}
                         onChange={(e) => updateItem(index, 'price', parseInt(e.target.value) || 0)}
-                        className="h-8 w-20 rounded-lg text-sm bg-white dark:bg-white/5 border-border/60"
+                        onFocus={(e) => e.target.select()}
+                        className="h-11 w-full rounded-xl text-center text-base font-semibold bg-white dark:bg-white/5 border-border/60"
                       />
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {priceLabel}
-                      </span>
                     </div>
                   </div>
                 </div>
