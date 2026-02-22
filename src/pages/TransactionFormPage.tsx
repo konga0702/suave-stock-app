@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
+import { applyCompletedTransaction } from '@/lib/inventory'
 import { toast } from 'sonner'
 import type { Product, TransactionType, TransactionCategory, TransactionStatus } from '@/types/database'
 
@@ -258,6 +259,23 @@ export function TransactionFormPage() {
             }))
           )
         if (itemsError) throw itemsError
+
+        // 直接 COMPLETED で保存した場合も在庫・個体追跡に反映
+        if (status === 'COMPLETED') {
+          await applyCompletedTransaction(
+            newTx.id,
+            {
+              type,
+              date,
+              tracking_number: trackingNumber.trim() || null,
+              order_code: orderCode.trim() || null,
+              shipping_code: shippingCode.trim() || null,
+              partner_name: partnerName.trim() || null,
+            },
+            items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+          )
+        }
+
         toast.success('入出庫データを登録しました')
       }
       navigate('/transactions')

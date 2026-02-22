@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText, User, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Copy, Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine, Tag, ShoppingBag, Truck, FileText, User, CalendarDays, Clock, CheckCircle, Receipt, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
+import { applyCompletedTransaction, revertCompletedTransaction } from '@/lib/inventory'
 import { toast } from 'sonner'
 import type { Transaction, TransactionItem } from '@/types/database'
 
@@ -24,7 +25,9 @@ export function TransactionDetailPage() {
   const { id } = useParams()
   const [tx, setTx] = useState<Transaction | null>(null)
   const [items, setItems] = useState<TransactionItem[]>([])
-  const [completing, setCompleting] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -52,94 +55,69 @@ export function TransactionDetailPage() {
     load()
   }, [id])
 
-  // 予定完了 → 在庫反映 + 個体追跡登録
+  // 予定 → 完了（在庫反映 + inventory_items 登録）
   const handleComplete = async () => {
     if (!tx || !id) return
-    setCompleting(true)
+    setProcessing(true)
     try {
-      // 在庫数を更新
-      for (const item of items) {
-        const delta = tx.type === 'IN' ? item.quantity : -item.quantity
-        const { data: product } = await supabase
-          .from('products')
-          .select('current_stock')
-          .eq('id', item.product_id)
-          .single()
-        if (!product) continue
+      await applyCompletedTransaction(
+        id,
+        {
+          type: tx.type,
+          date: tx.date,
+          tracking_number: tx.tracking_number ?? null,
+          order_code: tx.order_code ?? null,
+          shipping_code: tx.shipping_code ?? null,
+          partner_name: tx.partner_name ?? null,
+        },
+        items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+      )
 
-        const newStock = product.current_stock + delta
-        await supabase
-          .from('products')
-          .update({ current_stock: newStock })
-          .eq('id', item.product_id)
-      }
-
-      // 個体追跡データの登録/更新
-      if (tx.type === 'IN') {
-        // 入庫: inventory_items に新規登録
-        const inventoryInserts = []
-        for (const item of items) {
-          for (let i = 0; i < item.quantity; i++) {
-            inventoryInserts.push({
-              product_id: item.product_id,
-              tracking_number: tx.tracking_number || `${id.slice(0, 8)}-${i + 1}`,
-              order_code: tx.order_code || null,
-              shipping_code: tx.shipping_code || null,
-              status: 'IN_STOCK',
-              in_transaction_id: id,
-              in_date: tx.date,
-              partner_name: tx.partner_name || null,
-            })
-          }
-        }
-        if (inventoryInserts.length > 0) {
-          const { error: invError } = await supabase
-            .from('inventory_items')
-            .insert(inventoryInserts)
-          if (invError) {
-            console.error('inventory_items insert error:', invError)
-          }
-        }
-      } else {
-        // 出庫: 該当商品のIN_STOCK個体をSHIPPEDに更新 (FIFO)
-        for (const item of items) {
-          const { data: stockItems } = await supabase
-            .from('inventory_items')
-            .select('id')
-            .eq('product_id', item.product_id)
-            .eq('status', 'IN_STOCK')
-            .order('in_date', { ascending: true })
-            .limit(item.quantity)
-
-          if (stockItems && stockItems.length > 0) {
-            const ids = stockItems.map((si) => si.id)
-            await supabase
-              .from('inventory_items')
-              .update({
-                status: 'SHIPPED',
-                out_transaction_id: id,
-                out_date: tx.date,
-                shipping_code: tx.shipping_code || null,
-                order_code: tx.order_code || null,
-              })
-              .in('id', ids)
-          }
-        }
-      }
-
-      // ステータス更新
-      const { error } = await supabase
+      await supabase
         .from('transactions')
-        .update({ status: 'COMPLETED' })
+        .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
         .eq('id', id)
-      if (error) throw error
 
       toast.success('完了しました。在庫数と個体追跡を反映しました。')
       setTx({ ...tx, status: 'COMPLETED' })
+      setShowCompleteConfirm(false)
     } catch {
       toast.error('完了処理に失敗しました')
     } finally {
-      setCompleting(false)
+      setProcessing(false)
+    }
+  }
+
+  // 完了 → 予定に戻す（在庫巻き戻し + inventory_items 削除/復元）
+  const handleRevert = async () => {
+    if (!tx || !id) return
+    setProcessing(true)
+    try {
+      await revertCompletedTransaction(
+        id,
+        {
+          type: tx.type,
+          date: tx.date,
+          tracking_number: tx.tracking_number ?? null,
+          order_code: tx.order_code ?? null,
+          shipping_code: tx.shipping_code ?? null,
+          partner_name: tx.partner_name ?? null,
+        },
+        items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+      )
+
+      await supabase
+        .from('transactions')
+        .update({ status: 'SCHEDULED', updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      toast.success('予定に戻しました。在庫数と個体追跡を巻き戻しました。')
+      setTx({ ...tx, status: 'SCHEDULED' })
+      setShowRevertConfirm(false)
+    } catch {
+      toast.error('戻し処理に失敗しました')
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -209,7 +187,8 @@ export function TransactionDetailPage() {
 
   const isIN = tx.type === 'IN'
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
-  const hasAnyCodes = !!tx.tracking_number || !!tx.order_code || !!tx.shipping_code
+  const hasAnyCodes = !!tx.tracking_number || !!tx.order_code || !!tx.shipping_code || !!tx.purchase_order_code
+  const hasCustomerInfo = !!tx.customer_name || !!tx.order_date || !!tx.partner_name || !!tx.order_id
 
   return (
     <div className="page-transition space-y-4">
@@ -254,7 +233,7 @@ export function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* タイプ＆ステータス ヘッダーバナー */}
+      {/* タイプ＆カテゴリ ヘッダーバナー */}
       <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${
         isIN
           ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-500 shadow-slate-700/20'
@@ -281,18 +260,39 @@ export function TransactionDetailPage() {
               {tx.partner_name && <span>{tx.partner_name}</span>}
             </div>
           </div>
-          <div className="ml-auto">
-            <Badge className={`rounded-lg px-2.5 py-1 text-xs border-0 font-semibold ${
-              tx.status === 'SCHEDULED'
-                ? 'bg-white/20 text-white'
-                : 'bg-white text-emerald-700'
-            }`}>
-              {tx.status === 'SCHEDULED' ? '予定' : '完了'}
-            </Badge>
-          </div>
         </div>
         <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/[0.06]" />
         <div className="absolute -bottom-4 right-6 h-16 w-16 rounded-full bg-white/[0.04]" />
+      </div>
+
+      {/* ステータス切り替えトグル */}
+      <div className="flex rounded-xl border border-border/60 overflow-hidden bg-muted/30 p-0.5 gap-0.5">
+        <button
+          type="button"
+          onClick={() => tx.status === 'COMPLETED' && setShowRevertConfirm(true)}
+          disabled={processing}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-bold transition-all ${
+            tx.status === 'SCHEDULED'
+              ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30 cursor-default'
+              : 'text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/30 cursor-pointer'
+          }`}
+        >
+          <Clock className="h-4 w-4" />
+          作業予定
+        </button>
+        <button
+          type="button"
+          onClick={() => tx.status === 'SCHEDULED' && setShowCompleteConfirm(true)}
+          disabled={processing}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-bold transition-all ${
+            tx.status === 'COMPLETED'
+              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-default'
+              : 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer'
+          }`}
+        >
+          <CheckCircle className="h-4 w-4" />
+          作業履歴
+        </button>
       </div>
 
       {/* 管理番号・コード セクション */}
@@ -333,14 +333,37 @@ export function TransactionDetailPage() {
                 </div>
               </div>
             )}
+            {tx.purchase_order_code && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950">
+                  <Receipt className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-amber-500">発注コード</p>
+                  <p className="font-mono text-sm">{tx.purchase_order_code}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* 顧客名・注文日 */}
-      {(tx.customer_name || tx.order_date) && (
+      {/* 顧客情報・取引先 */}
+      {hasCustomerInfo && (
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3 p-5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">取引先・顧客情報</p>
+            {tx.partner_name && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                  <User className="h-4 w-4 text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-slate-500">取引先</p>
+                  <p className="text-sm">{tx.partner_name}</p>
+                </div>
+              </div>
+            )}
             {tx.customer_name && (
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950">
@@ -360,6 +383,17 @@ export function TransactionDetailPage() {
                 <div>
                   <p className="text-[10px] font-medium text-teal-500">注文日</p>
                   <p className="text-sm">{tx.order_date}</p>
+                </div>
+              </div>
+            )}
+            {tx.order_id && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 dark:bg-orange-950">
+                  <Hash className="h-4 w-4 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-orange-500">注文ID</p>
+                  <p className="font-mono text-sm">{tx.order_id}</p>
                 </div>
               </div>
             )}
@@ -417,7 +451,7 @@ export function TransactionDetailPage() {
                   )}
                   <p className="text-xs text-muted-foreground">
                     {item.quantity} × ¥{Number(item.price).toLocaleString()}
-                    <span className={`ml-1.5 opacity-60`}>({priceLabel})</span>
+                    <span className="ml-1.5 opacity-60">({priceLabel})</span>
                   </p>
                 </div>
               </div>
@@ -445,45 +479,49 @@ export function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* 完了ボタン（予定の場合のみ） */}
-      {tx.status === 'SCHEDULED' && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              className={`w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold transition-all duration-300 ${
-                isIN
-                  ? 'bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300'
-                  : 'bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500'
-              }`}
-              size="lg"
-              disabled={completing}
+      {/* 完了確認ダイアログ */}
+      <AlertDialog open={showCompleteConfirm} onOpenChange={setShowCompleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>作業履歴に移動しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              在庫数が{tx.type === 'IN' ? '増加' : '減少'}し、個体追跡データが更新されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={processing}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleComplete}
+              disabled={processing}
+              className={`rounded-xl ${isIN ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
             >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              {completing ? '処理中...' : '完了にする（在庫反映）'}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="rounded-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>入出庫を完了にしますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                在庫数が{tx.type === 'IN' ? '増加' : '減少'}し、個体追跡データが更新されます。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="rounded-xl">キャンセル</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleComplete}
-                className={`rounded-xl ${isIN
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-amber-500 hover:bg-amber-600'
-                }`}
-              >
-                完了にする
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+              {processing ? '処理中...' : '完了にする'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 予定に戻す確認ダイアログ */}
+      <AlertDialog open={showRevertConfirm} onOpenChange={setShowRevertConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>作業予定に戻しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              在庫数が{tx.type === 'IN' ? '減少' : '増加'}し、個体追跡データが巻き戻されます。誤って履歴に移動した場合にご利用ください。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={processing}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRevert}
+              disabled={processing}
+              className="rounded-xl bg-sky-500 hover:bg-sky-600"
+            >
+              {processing ? '処理中...' : '予定に戻す'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
