@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck, ChevronDown, Calendar } from 'lucide-react'
+import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -682,9 +683,25 @@ export function TransactionsPage() {
 
       {/* タブ（上部） */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full rounded-xl bg-muted/50 p-1">
-          <TabsTrigger value="SCHEDULED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業予定</TabsTrigger>
-          <TabsTrigger value="COMPLETED" className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-700 transition-all">作業履歴</TabsTrigger>
+        <TabsList className="w-full rounded-xl bg-slate-100 dark:bg-slate-800 p-1 h-12 gap-1">
+          <TabsTrigger
+            value="SCHEDULED"
+            className="flex-1 rounded-lg h-10 text-sm font-bold transition-all
+              data-[state=active]:bg-sky-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-500/30
+              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-sky-500"
+          >
+            <CalendarCheck className="mr-1.5 h-4 w-4" />
+            作業予定
+          </TabsTrigger>
+          <TabsTrigger
+            value="COMPLETED"
+            className="flex-1 rounded-lg h-10 text-sm font-bold transition-all
+              data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/30
+              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-emerald-500"
+          >
+            <CheckCircle className="mr-1.5 h-4 w-4" />
+            作業履歴
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4 space-y-3">
@@ -711,6 +728,14 @@ export function TransactionsPage() {
                 </Button>
               )}
             </div>
+            {/* カメラスキャンで検索 */}
+            <BarcodeScanButton
+              className="h-10 w-10 rounded-xl border-border/60 hover:bg-accent"
+              onScan={(value) => {
+                setSearch(value)
+                toast.info(`スキャン: ${value}`)
+              }}
+            />
             <Button
               variant="outline"
               size="icon"

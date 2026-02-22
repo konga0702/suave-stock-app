@@ -33,6 +33,8 @@ export interface Transaction {
   partner_name: string | null
   customer_name: string | null
   order_date: string | null
+  purchase_order_code: string | null
+  order_id: string | null
   total_amount: number
   memo: string | null
   created_at: string

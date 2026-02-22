@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package, User, CalendarDays,
+  ArrowLeft, Trash2, Plus, ClipboardPaste, Tag, Truck, ShoppingBag, Search, X, Package, User, CalendarDays, CheckCircle, Clock, Receipt, Hash,
 } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
@@ -49,13 +49,22 @@ export function TransactionFormPage() {
     ((searchParams.get('type') || 'IN') === 'IN' ? '入荷' : '出荷')
   )
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+
+  // ① 基本情報に移動: 管理番号
   const [trackingNumber, setTrackingNumber] = useState('')
+
+  // ③ コード・取引情報
   const [orderCode, setOrderCode] = useState('')
   const [shippingCode, setShippingCode] = useState('')
-  const [partnerName, setPartnerName] = useState('')
+  const [purchaseOrderCode, setPurchaseOrderCode] = useState('')  // 発注コード（新規）
+  const [partnerName, setPartnerName] = useState('')              // 取引先（③に移動）
+  const [orderDate, setOrderDate] = useState('')                  // 注文日（③に移動）
+
+  // ④ 顧客情報・メモ
   const [customerName, setCustomerName] = useState('')
-  const [orderDate, setOrderDate] = useState('')
+  const [orderId, setOrderId] = useState('')                      // 注文ID（新規）
   const [memo, setMemo] = useState('')
+
   const [items, setItems] = useState<ItemRow[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
@@ -90,9 +99,11 @@ export function TransactionFormPage() {
       setTrackingNumber(tx.tracking_number ?? '')
       setOrderCode(tx.order_code ?? '')
       setShippingCode(tx.shipping_code ?? '')
+      setPurchaseOrderCode(tx.purchase_order_code ?? '')
       setPartnerName(tx.partner_name ?? '')
       setCustomerName(tx.customer_name ?? '')
       setOrderDate(tx.order_date ?? '')
+      setOrderId(tx.order_id ?? '')
       setMemo(tx.memo ?? '')
 
       const { data: txItems } = await supabase
@@ -163,7 +174,7 @@ export function TransactionFormPage() {
         ])
       }
     },
-    [items]
+    [items, type]
   )
 
   const updateItem = (index: number, field: keyof ItemRow, value: string | number) => {
@@ -199,9 +210,11 @@ export function TransactionFormPage() {
         tracking_number: trackingNumber.trim() || null,
         order_code: orderCode.trim() || null,
         shipping_code: shippingCode.trim() || null,
+        purchase_order_code: purchaseOrderCode.trim() || null,
         partner_name: partnerName.trim() || null,
         customer_name: customerName.trim() || null,
         order_date: orderDate || null,
+        order_id: orderId.trim() || null,
         total_amount: totalAmount,
         memo: memo.trim() || null,
       }
@@ -286,15 +299,20 @@ export function TransactionFormPage() {
   // 単価ラベル（入庫=仕入れ単価, 出庫=販売単価）
   const priceLabel = isIN ? '仕入れ単価' : '販売単価'
 
+  // ページタイトル
+  const pageTitle = isEdit
+    ? '入出庫編集'
+    : status === 'SCHEDULED'
+      ? (isIN ? '新規入荷予定' : '新規出荷予定')
+      : (isIN ? '新規入荷' : '新規出荷')
+
   return (
     <div className="page-transition space-y-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold tracking-tight">
-          {isEdit ? '入出庫編集' : isIN ? '新規入庫' : '新規出庫'}
-        </h1>
+        <h1 className="text-xl font-bold tracking-tight">{pageTitle}</h1>
       </div>
 
       <div className="space-y-4">
@@ -311,6 +329,35 @@ export function TransactionFormPage() {
               </div>
               <p className="text-sm font-semibold">基本情報</p>
             </div>
+
+            {/* 作業予定 / 作業履歴 トグル */}
+            <div className="flex rounded-xl border border-border/60 overflow-hidden bg-muted/30 p-0.5 gap-0.5">
+              <button
+                type="button"
+                onClick={() => setStatus('SCHEDULED')}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-bold transition-all ${
+                  status === 'SCHEDULED'
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+                    : 'text-muted-foreground hover:text-sky-500'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                作業予定
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('COMPLETED')}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-bold transition-all ${
+                  status === 'COMPLETED'
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                    : 'text-muted-foreground hover:text-emerald-500'
+                }`}
+              >
+                <CheckCircle className="h-4 w-4" />
+                作業履歴
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">タイプ</Label>
@@ -347,6 +394,40 @@ export function TransactionFormPage() {
                 onChange={(e) => setDate(e.target.value)}
                 className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
+            </div>
+
+            {/* 管理番号（③から移動） */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Tag className="h-3 w-3 text-violet-500" />
+                <Label className="text-xs text-muted-foreground">管理番号</Label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  placeholder="手入力 or スキャン"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <BarcodeScanButton
+                  className="border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
+                  onScan={(value) => {
+                    setTrackingNumber(value)
+                    toast.success(`読取: ${value}`)
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
+                  onClick={() => pasteToField(setTrackingNumber)}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -508,7 +589,7 @@ export function TransactionFormPage() {
           </CardContent>
         </Card>
 
-        {/* ③ 管理番号・コード */}
+        {/* ③ コード・取引情報 */}
         <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
           <CardContent className="space-y-3.5 p-5">
             <div className="flex items-center gap-2.5">
@@ -519,41 +600,7 @@ export function TransactionFormPage() {
                   isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
                 }`}>3</span>
               </div>
-              <p className="text-sm font-semibold">管理番号・コード</p>
-            </div>
-
-            {/* 管理番号 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Tag className="h-3 w-3 text-violet-500" />
-                <Label className="text-xs text-muted-foreground">管理番号</Label>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="手入力 or スキャン"
-                  inputMode="text"
-                  enterKeyHint="done"
-                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
-                />
-                <BarcodeScanButton
-                  className="border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
-                  onScan={(value) => {
-                    setTrackingNumber(value)
-                    toast.success(`読取: ${value}`)
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 rounded-xl border-violet-200 dark:border-violet-800 text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950 transition-colors"
-                  onClick={() => pasteToField(setTrackingNumber)}
-                  title="貼り付け"
-                >
-                  <ClipboardPaste className="h-4 w-4" />
-                </Button>
-              </div>
+              <p className="text-sm font-semibold">コード・取引情報</p>
             </div>
 
             {/* 注文コード */}
@@ -623,24 +670,42 @@ export function TransactionFormPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* ④ 取引先・メモ */}
-        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
-          <CardContent className="space-y-3.5 p-5">
-            <div className="flex items-center gap-2.5">
-              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
-              }`}>
-                <span className={`text-xs font-bold ${
-                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
-                }`}>4</span>
+            {/* 発注コード（新規） */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Receipt className="h-3 w-3 text-amber-500" />
+                <Label className="text-xs text-muted-foreground">発注コード</Label>
               </div>
-              <p className="text-sm font-semibold">
-                {isIN ? '取引先・メモ' : '顧客情報・メモ'}
-              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={purchaseOrderCode}
+                  onChange={(e) => setPurchaseOrderCode(e.target.value)}
+                  placeholder="発注番号・POナンバーなど"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <BarcodeScanButton
+                  className="border-amber-200 dark:border-amber-800 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                  onScan={(value) => {
+                    setPurchaseOrderCode(value)
+                    toast.success(`読取: ${value}`)
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl border-amber-200 dark:border-amber-800 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors"
+                  onClick={() => pasteToField(setPurchaseOrderCode)}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+
+            {/* 取引先（④から移動） */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground" htmlFor="partner">
                 {isIN ? '取引先 (仕入先)' : '取引先'}
@@ -653,19 +718,8 @@ export function TransactionFormPage() {
                 className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <User className="h-3 w-3 text-indigo-500" />
-                <Label className="text-xs text-muted-foreground" htmlFor="customerName">顧客名</Label>
-              </div>
-              <Input
-                id="customerName"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="顧客名・購入者名"
-                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
-              />
-            </div>
+
+            {/* 注文日（④から移動） */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="h-3 w-3 text-teal-500" />
@@ -679,6 +733,73 @@ export function TransactionFormPage() {
                 className="rounded-xl bg-white dark:bg-white/5 border-border/60"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ④ 顧客情報・メモ */}
+        <Card className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none">
+          <CardContent className="space-y-3.5 p-5">
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                isIN ? 'bg-sky-100 dark:bg-sky-950' : 'bg-amber-100 dark:bg-amber-950'
+              }`}>
+                <span className={`text-xs font-bold ${
+                  isIN ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>4</span>
+              </div>
+              <p className="text-sm font-semibold">顧客情報・メモ</p>
+            </div>
+
+            {/* 顧客名 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <User className="h-3 w-3 text-indigo-500" />
+                <Label className="text-xs text-muted-foreground" htmlFor="customerName">顧客名</Label>
+              </div>
+              <Input
+                id="customerName"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="顧客名・購入者名"
+                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
+              />
+            </div>
+
+            {/* 注文ID（新規） */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Hash className="h-3 w-3 text-orange-500" />
+                <Label className="text-xs text-muted-foreground">注文ID</Label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  placeholder="顧客注文ID・注文番号など"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                <BarcodeScanButton
+                  className="border-orange-200 dark:border-orange-800 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950"
+                  onScan={(value) => {
+                    setOrderId(value)
+                    toast.success(`読取: ${value}`)
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl border-orange-200 dark:border-orange-800 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950 transition-colors"
+                  onClick={() => pasteToField(setOrderId)}
+                  title="貼り付け"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* メモ */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground" htmlFor="memo">メモ</Label>
               <Textarea
