@@ -1045,6 +1045,14 @@ export function TransactionsPage() {
                           {tx.order_code && (
                             <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
                           )}
+                          {/* 発注コード */}
+                          {tx.purchase_order_code && (
+                            <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">PO: {tx.purchase_order_code}</p>
+                          )}
+                          {/* 注文ID */}
+                          {tx.order_id && (
+                            <p className="font-mono text-[11px] text-orange-600/80 dark:text-orange-400/70 truncate mt-0.5">#{tx.order_id}</p>
+                          )}
                           {/* 注文日 */}
                           {tx.order_date && (
                             <p className="text-[11px] text-muted-foreground mt-0.5">注文日: {tx.order_date.replace(/-/g, '/')}</p>
@@ -1118,6 +1126,14 @@ export function TransactionsPage() {
                             {/* 注文コード */}
                             {tx.order_code && (
                               <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
+                            )}
+                            {/* 発注コード */}
+                            {tx.purchase_order_code && (
+                              <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">PO: {tx.purchase_order_code}</p>
+                            )}
+                            {/* 注文ID */}
+                            {tx.order_id && (
+                              <p className="font-mono text-[11px] text-orange-600/80 dark:text-orange-400/70 truncate mt-0.5">#{tx.order_id}</p>
                             )}
                             {/* 注文日 */}
                             {tx.order_date && (

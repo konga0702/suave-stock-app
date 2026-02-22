@@ -285,7 +285,7 @@ export async function exportTransactionsDetailCsvWithFilters(
   }
 
   // Step 6: CSV生成
-  const header = '日付,区分,カテゴリ,ステータス,商品名,数量,単価,小計,合計金額,取引先,管理番号,注文コード,追跡コード,メモ'
+  const header = '日付,区分,カテゴリ,ステータス,商品名,数量,単価,小計,合計金額,取引先,管理番号,注文コード,追跡コード,発注コード,注文日,顧客名,注文ID,メモ'
 
   const rows: string[] = []
   for (const tx of txs) {
@@ -308,6 +308,10 @@ export async function exportTransactionsDetailCsvWithFilters(
         esc(tx.tracking_number),
         esc(tx.order_code),
         esc(tx.shipping_code),
+        esc(tx.purchase_order_code),
+        esc(tx.order_date),
+        esc(tx.customer_name),
+        esc(tx.order_id),
         esc(tx.memo),
       ].join(','))
     } else {
@@ -327,6 +331,10 @@ export async function exportTransactionsDetailCsvWithFilters(
           idx === 0 ? esc(tx.tracking_number) : '',
           idx === 0 ? esc(tx.order_code) : '',
           idx === 0 ? esc(tx.shipping_code) : '',
+          idx === 0 ? esc(tx.purchase_order_code) : '',
+          idx === 0 ? esc(tx.order_date) : '',
+          idx === 0 ? esc(tx.customer_name) : '',
+          idx === 0 ? esc(tx.order_id) : '',
           idx === 0 ? esc(tx.memo) : '',
         ].join(','))
       })
@@ -353,7 +361,7 @@ export function exportTransactionsCsv(_transactions: Transaction[]) {
 
 /**
  * 入出庫CSVインポート（新フォーマット対応）
- * CSV形式: 日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,メモ
+ * CSV形式: 日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,発注コード,注文日,顧客名,注文ID,メモ
  *
  * 同じ管理番号の行はひとつの取引にまとめられる。
  * 管理番号が空の場合は行ごとに個別の取引として登録。
@@ -460,11 +468,16 @@ export async function importTransactionsCsv(text: string) {
     trackingNumber: string | null
     orderCode: string | null
     shippingCode: string | null
+    purchaseOrderCode: string | null
+    orderDate: string | null
+    customerName: string | null
+    orderId: string | null
     memo: string | null
   }
 
   const parsedRows: ParsedRow[] = []
   let lastBase: Omit<ParsedRow, 'csvLine' | 'productName' | 'productCode' | 'quantity' | 'price'> | null = null
+
 
   for (const { r, csvLine } of dataRows) {
     const date = get(r, '日付')
@@ -479,13 +492,17 @@ export async function importTransactionsCsv(text: string) {
       lastBase = {
         date,
         type,
-        status:        parseStatus(statusStr),
-        category:      cat || defaultCategory(type),
-        partnerName:   get(r, '取引先')   || null,
-        trackingNumber: get(r, '管理番号') || null,
-        orderCode:     get(r, '注文コード') || null,
-        shippingCode:  get(r, '追跡コード') || null,
-        memo:          get(r, 'メモ')      || null,
+        status:            parseStatus(statusStr),
+        category:          cat || defaultCategory(type),
+        partnerName:       get(r, '取引先')   || null,
+        trackingNumber:    get(r, '管理番号') || null,
+        orderCode:         get(r, '注文コード') || null,
+        shippingCode:      get(r, '追跡コード') || null,
+        purchaseOrderCode: get(r, '発注コード') || null,
+        orderDate:         get(r, '注文日')    || null,
+        customerName:      get(r, '顧客名')    || null,
+        orderId:           get(r, '注文ID')    || null,
+        memo:              get(r, 'メモ')      || null,
       }
     }
 
@@ -522,6 +539,10 @@ export async function importTransactionsCsv(text: string) {
     trackingNumber: string | null
     orderCode: string | null
     shippingCode: string | null
+    purchaseOrderCode: string | null
+    orderDate: string | null
+    customerName: string | null
+    orderId: string | null
     memo: string | null
     items: Array<{ csvLine: number; productName: string; productCode: string; quantity: number; price: number }>
   }
@@ -545,15 +566,19 @@ export async function importTransactionsCsv(text: string) {
       })
     } else {
       currentGroup = {
-        date:           row.date,
-        type:           row.type,
-        status:         row.status,
-        category:       row.category,
-        partnerName:    row.partnerName,
-        trackingNumber: row.trackingNumber,
-        orderCode:      row.orderCode,
-        shippingCode:   row.shippingCode,
-        memo:           row.memo,
+        date:              row.date,
+        type:              row.type,
+        status:            row.status,
+        category:          row.category,
+        partnerName:       row.partnerName,
+        trackingNumber:    row.trackingNumber,
+        orderCode:         row.orderCode,
+        shippingCode:      row.shippingCode,
+        purchaseOrderCode: row.purchaseOrderCode,
+        orderDate:         row.orderDate,
+        customerName:      row.customerName,
+        orderId:           row.orderId,
+        memo:              row.memo,
         items: [{
           csvLine:     row.csvLine,
           productName: row.productName,
@@ -613,16 +638,20 @@ export async function importTransactionsCsv(text: string) {
     const { data: newTx, error: txError } = await supabase
       .from('transactions')
       .insert({
-        type:            group.type,
-        status:          group.status,   // ← ステータス列を反映（旧実装は常にSCHEDULED固定だった）
-        category:        group.category,
-        date:            group.date,
-        tracking_number: group.trackingNumber,
-        order_code:      group.orderCode,
-        shipping_code:   group.shippingCode,
-        partner_name:    group.partnerName,
-        total_amount:    totalAmount,
-        memo:            group.memo,
+        type:                group.type,
+        status:              group.status,   // ← ステータス列を反映（旧実装は常にSCHEDULED固定だった）
+        category:            group.category,
+        date:                group.date,
+        tracking_number:     group.trackingNumber,
+        order_code:          group.orderCode,
+        shipping_code:       group.shippingCode,
+        purchase_order_code: group.purchaseOrderCode,
+        order_date:          group.orderDate,
+        customer_name:       group.customerName,
+        order_id:            group.orderId,
+        partner_name:        group.partnerName,
+        total_amount:        totalAmount,
+        memo:                group.memo,
       })
       .select()
       .single()
@@ -697,7 +726,7 @@ export async function downloadTransactionsTemplate() {
     .order('name')
     .limit(5)
 
-  const header = '日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,メモ'
+  const header = '日付,区分,カテゴリ,商品名,数量,単価,取引先,管理番号,注文コード,追跡コード,発注コード,注文日,顧客名,注文ID,メモ'
   const today = new Date().toISOString().split('T')[0]
 
   let sampleRows: string[]
@@ -716,6 +745,10 @@ export async function downloadTransactionsTemplate() {
         `TRK-00${i + 1}`,
         `ORD-00${i + 1}`,
         `SHP-00${i + 1}`,
+        `PO-00${i + 1}`,
+        today,
+        '',
+        '',
         'サンプルデータ',
       ].join(',')
     })
@@ -735,6 +768,10 @@ export async function downloadTransactionsTemplate() {
           'TRK-010',
           'ORD-010',
           'SHP-010',
+          '',
+          today,
+          '顧客サンプル',
+          'ORDER-001',
           '出荷サンプル',
         ].join(',')
       )
@@ -742,7 +779,7 @@ export async function downloadTransactionsTemplate() {
   } else {
     // 商品未登録の場合はガイド行
     sampleRows = [
-      `${today},入庫,入荷,※ここに登録済みの商品名を入力,1,1000,仕入先名,TRK-001,ORD-001,SHP-001,メモ`,
+      `${today},入庫,入荷,※ここに登録済みの商品名を入力,1,1000,仕入先名,TRK-001,ORD-001,SHP-001,PO-001,${today},,,メモ`,
     ]
   }
 
