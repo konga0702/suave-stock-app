@@ -470,9 +470,9 @@ export function TransactionFormPage() {
             </div>
 
             {/* 商品リスト */}
-            <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-border/40 p-2">
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-border/40 divide-y divide-border/30">
               {filteredProducts.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-3">
+                <p className="text-sm text-muted-foreground text-center py-5">
                   該当する商品がありません
                 </p>
               ) : (
@@ -481,31 +481,35 @@ export function TransactionFormPage() {
                     key={p.id}
                     type="button"
                     onClick={() => addItem(p)}
-                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all ${
+                    className={`w-full flex items-center gap-3 px-3 py-3.5 text-left transition-all ${
                       isIN
                         ? 'hover:bg-sky-50 active:bg-sky-100 dark:hover:bg-sky-950/50 dark:active:bg-sky-900/50'
                         : 'hover:bg-amber-50 active:bg-amber-100 dark:hover:bg-amber-950/50 dark:active:bg-amber-900/50'
                     }`}
                   >
                     {p.image_url ? (
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+                      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
                         <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
                       </div>
                     ) : (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
-                        <Package className="h-4 w-4 text-slate-400" />
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <Package className="h-5 w-5 text-slate-400" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold truncate">{p.name}</p>
+                      <p className="text-sm font-semibold leading-snug truncate">{p.name}</p>
                       {p.product_code && (
-                        <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{p.product_code}</p>
+                        <p className="font-mono text-xs text-muted-foreground/80 truncate mt-0.5">{p.product_code}</p>
                       )}
-                      <p className="text-[11px] text-muted-foreground">
-                        在庫: {p.current_stock} / {isIN ? '仕入' : '販売'}¥{Number(isIN ? (p.cost_price ?? p.default_unit_price ?? 0) : (p.selling_price ?? p.default_unit_price ?? 0)).toLocaleString()}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        在庫: {p.current_stock} &nbsp;/&nbsp; {isIN ? '仕入' : '販売'} ¥{Number(isIN ? (p.cost_price ?? p.default_unit_price ?? 0) : (p.selling_price ?? p.default_unit_price ?? 0)).toLocaleString()}
                       </p>
                     </div>
-                    <Plus className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                    <div className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-full ${
+                      isIN ? 'bg-sky-100 dark:bg-sky-900' : 'bg-amber-100 dark:bg-amber-900'
+                    }`}>
+                      <Plus className={`h-4 w-4 ${isIN ? 'text-sky-500' : 'text-amber-500'}`} />
+                    </div>
                   </button>
                 ))
               )}
