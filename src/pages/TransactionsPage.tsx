@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck, ChevronDown, Calendar } from 'lucide-react'
+import { Plus, Upload, Search, X, ArrowDownToLine, ArrowUpFromLine, FileDown, CheckSquare, Square, CheckCheck, Trash2, ArrowUpDown, Filter, ClipboardList, CheckCircle, CalendarCheck, ChevronDown, Calendar, Package } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -974,9 +974,9 @@ export function TransactionsPage() {
                     onClick={() => toggleSelect(tx.id)}
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {/* チェックボックス */}
-                        <div className="shrink-0 mt-0.5">
+                      {/* ヘッダー行: チェック + アイコン + タイプ+日付 + 件数 */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="shrink-0">
                           {selectedIds.has(tx.id) ? (
                             <div className="flex h-5 w-5 items-center justify-center rounded bg-sky-500 text-white">
                               <CheckSquare className="h-3.5 w-3.5" />
@@ -987,37 +987,68 @@ export function TransactionsPage() {
                             </div>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          {/* ヘッダー行 */}
-                          <div className="flex items-start justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              {isIN ? (
-                                <ArrowDownToLine className="h-[18px] w-[18px] shrink-0 text-sky-500" />
-                              ) : (
-                                <ArrowUpFromLine className="h-[18px] w-[18px] shrink-0 text-rose-500" />
-                              )}
-                              <span className={`text-[13px] font-bold ${
-                                isIN ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'
-                              }`}>
-                                {tab === 'SCHEDULED'
-                                  ? (isIN ? '入荷予定' : '出荷予定')
-                                  : (isIN ? '入荷' : '出荷')
-                                }{' '}{tx.date}
-                              </span>
-                            </div>
-                            {(tx.itemCount ?? 0) > 0 && (
-                              <div className="flex flex-col items-end leading-none shrink-0 ml-2">
-                                <span className={`text-sm font-bold ${isIN ? 'text-sky-500' : 'text-rose-500'}`}>+{tx.itemCount}</span>
-                                <span className="text-[10px] text-muted-foreground">/1</span>
-                              </div>
+                        <div className="flex flex-1 items-center justify-between min-w-0">
+                          <div className="flex items-center gap-2">
+                            {isIN ? (
+                              <ArrowDownToLine className="h-5 w-5 shrink-0 text-sky-500" />
+                            ) : (
+                              <ArrowUpFromLine className="h-5 w-5 shrink-0 text-rose-500" />
                             )}
+                            <span className={`text-sm font-bold ${
+                              isIN ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {tab === 'SCHEDULED'
+                                ? (isIN ? '入荷予定' : '出荷予定')
+                                : (isIN ? '入荷' : '出荷')
+                              }{' '}{tx.date}
+                            </span>
                           </div>
-                          {tx.partner_name && <p className="text-[12px] text-muted-foreground mb-0.5 truncate">{tx.partner_name}</p>}
-                          {tx.firstProductName && (
-                            <p className="text-[13px] font-medium mb-0.5 leading-snug line-clamp-2">{tx.firstProductName}</p>
+                          {(tx.itemCount ?? 0) > 0 && (
+                            <div className="flex flex-col items-end leading-none shrink-0 ml-2">
+                              <span className={`text-sm font-bold ${isIN ? 'text-sky-500' : 'text-rose-500'}`}>+{tx.itemCount}</span>
+                              <span className="text-[10px] text-muted-foreground">/1</span>
+                            </div>
                           )}
-                          {tx.order_date && <p className="text-[11px] text-muted-foreground">注文日: {tx.order_date.replace(/-/g, '/')}</p>}
-                          {tx.order_code && <p className="font-mono text-[11px] text-muted-foreground/70 truncate">{tx.order_code}</p>}
+                        </div>
+                      </div>
+
+                      {/* メインコンテンツ: 画像 + テキスト */}
+                      <div className="flex gap-3 pl-8">
+                        {/* 商品画像サムネイル */}
+                        {tx.firstProductImage ? (
+                          <div className="shrink-0 h-[72px] w-[72px] overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-border/30">
+                            <img src={tx.firstProductImage} alt={tx.firstProductName ?? ''} className="h-full w-full object-cover" />
+                          </div>
+                        ) : tx.firstProductName ? (
+                          <div className="shrink-0 flex h-[72px] w-[72px] items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 border border-border/30">
+                            <Package className="h-6 w-6 text-slate-400" />
+                          </div>
+                        ) : null}
+
+                        {/* テキスト情報 */}
+                        <div className="flex-1 min-w-0">
+                          {/* 管理番号: 商品名の上に目立つ表示 */}
+                          {tx.tracking_number && (
+                            <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate mb-1">
+                              {tx.tracking_number}
+                            </p>
+                          )}
+                          {/* 商品名 */}
+                          {tx.firstProductName && (
+                            <p className="text-sm font-semibold leading-snug line-clamp-2 mb-1">{tx.firstProductName}</p>
+                          )}
+                          {/* 取引先 */}
+                          {tx.partner_name && (
+                            <p className="text-xs text-muted-foreground truncate">{tx.partner_name}</p>
+                          )}
+                          {/* 注文コード */}
+                          {tx.order_code && (
+                            <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
+                          )}
+                          {/* 注文日 */}
+                          {tx.order_date && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5">注文日: {tx.order_date.replace(/-/g, '/')}</p>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -1027,14 +1058,14 @@ export function TransactionsPage() {
                     <Card className="border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white dark:bg-white/[0.03]">
                       <CardContent className="p-4">
                         {/* ヘッダー行: アイコン + タイプ+日付 + 件数バッジ */}
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             {isIN ? (
-                              <ArrowDownToLine className="h-[18px] w-[18px] shrink-0 text-sky-500" />
+                              <ArrowDownToLine className="h-5 w-5 shrink-0 text-sky-500" />
                             ) : (
-                              <ArrowUpFromLine className="h-[18px] w-[18px] shrink-0 text-rose-500" />
+                              <ArrowUpFromLine className="h-5 w-5 shrink-0 text-rose-500" />
                             )}
-                            <span className={`text-[13px] font-bold ${
+                            <span className={`text-sm font-bold ${
                               isIN ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'
                             }`}>
                               {tab === 'SCHEDULED'
@@ -1052,32 +1083,48 @@ export function TransactionsPage() {
                             </div>
                           )}
                         </div>
-                        {/* 取引先名 */}
-                        {tx.partner_name && (
-                          <p className="text-[12px] text-muted-foreground mb-1 truncate">{tx.partner_name}</p>
-                        )}
-                        {/* 商品名 */}
-                        {tx.firstProductName && (
-                          <p className="text-[13px] font-medium mb-1 leading-snug line-clamp-2">
-                            {tx.firstProductName}
-                            {(tx.itemCount ?? 0) > 1 && (
-                              <span className="text-[11px] text-muted-foreground font-normal">
-                                {', '}{tx.firstProductCode && <span className="font-mono">{tx.firstProductCode}</span>}
-                              </span>
+
+                        {/* メインコンテンツ: 画像 + テキスト */}
+                        <div className="flex gap-3">
+                          {/* 商品画像サムネイル */}
+                          {tx.firstProductImage ? (
+                            <div className="shrink-0 h-[72px] w-[72px] overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-border/30">
+                              <img src={tx.firstProductImage} alt={tx.firstProductName ?? ''} className="h-full w-full object-cover" />
+                            </div>
+                          ) : tx.firstProductName ? (
+                            <div className="shrink-0 flex h-[72px] w-[72px] items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 border border-border/30">
+                              <Package className="h-6 w-6 text-slate-400" />
+                            </div>
+                          ) : null}
+
+                          {/* テキスト情報 */}
+                          <div className="flex-1 min-w-0">
+                            {/* 管理番号: 商品名の上に目立つ表示 */}
+                            {tx.tracking_number && (
+                              <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate mb-1">
+                                {tx.tracking_number}
+                              </p>
                             )}
-                          </p>
-                        )}
-                        {/* 注文日 */}
-                        {tx.order_date && (
-                          <p className="text-[11px] text-muted-foreground">注文日: {tx.order_date.replace(/-/g, '/')}</p>
-                        )}
-                        {/* 管理番号 */}
-                        {tx.order_code && (
-                          <p className="font-mono text-[11px] text-muted-foreground/70 truncate mt-0.5">{tx.order_code}</p>
-                        )}
-                        {tx.tracking_number && (
-                          <p className="font-mono text-[11px] text-muted-foreground/60 truncate">{tx.tracking_number}</p>
-                        )}
+                            {/* 商品名 */}
+                            {tx.firstProductName && (
+                              <p className="text-sm font-semibold leading-snug line-clamp-2 mb-1">
+                                {tx.firstProductName}
+                              </p>
+                            )}
+                            {/* 取引先 */}
+                            {tx.partner_name && (
+                              <p className="text-xs text-muted-foreground truncate">{tx.partner_name}</p>
+                            )}
+                            {/* 注文コード */}
+                            {tx.order_code && (
+                              <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
+                            )}
+                            {/* 注文日 */}
+                            {tx.order_date && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5">注文日: {tx.order_date.replace(/-/g, '/')}</p>
+                            )}
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
                   </Link>
