@@ -70,6 +70,7 @@ export function TransactionFormPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loadingData, setLoadingData] = useState(false)
 
   useEffect(() => {
     supabase
@@ -83,6 +84,7 @@ export function TransactionFormPage() {
 
   useEffect(() => {
     if (!id) return
+    setLoadingData(true)
     async function load() {
       const { data: tx } = await supabase
         .from('transactions')
@@ -128,7 +130,7 @@ export function TransactionFormPage() {
         )
       }
     }
-    load()
+    load().finally(() => setLoadingData(false))
   }, [id])
 
   // type変更時にcategoryリセット（初回マウント時はスキップ）
@@ -862,9 +864,9 @@ export function TransactionFormPage() {
           }`}
           size="lg"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loadingData}
         >
-          {saving ? '保存中...' : isEdit ? '更新する' : status === 'SCHEDULED' ? '予定として登録する' : '登録する'}
+          {saving ? '保存中...' : loadingData ? '読み込み中...' : isEdit ? '更新する' : status === 'SCHEDULED' ? '予定として登録する' : '登録する'}
         </Button>
       </div>
     </div>

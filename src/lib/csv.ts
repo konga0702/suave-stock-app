@@ -356,6 +356,7 @@ export async function exportTransactionsDetailCsv() {
 
 // 旧互換（インポート用）
 export function exportTransactionsCsv(_transactions: Transaction[]) {
+  void _transactions
   exportTransactionsDetailCsvWithFilters()
 }
 

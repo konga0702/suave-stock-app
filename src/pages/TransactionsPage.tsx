@@ -221,7 +221,7 @@ export function TransactionsPage() {
 
       // Step 2: transaction_items取得（Promise.allで並列化）
       const txIds = allTxData.map((tx) => tx.id)
-      let itemsData: { transaction_id: string; product_id: string }[] = []
+      const itemsData: { transaction_id: string; product_id: string }[] = []
 
       if (txIds.length > 0) {
         const BATCH_SIZE = 50
