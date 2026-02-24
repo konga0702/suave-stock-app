@@ -1103,7 +1103,7 @@ export function TransactionsPage() {
                           )}
                           {/* 発注コード */}
                           {tx.purchase_order_code && (
-                            <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">PO: {tx.purchase_order_code}</p>
+                            <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">発注: {tx.purchase_order_code}</p>
                           )}
                           {/* 注文ID */}
                           {tx.order_id && (
@@ -1185,7 +1185,7 @@ export function TransactionsPage() {
                             )}
                             {/* 発注コード */}
                             {tx.purchase_order_code && (
-                              <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">PO: {tx.purchase_order_code}</p>
+                              <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">発注: {tx.purchase_order_code}</p>
                             )}
                             {/* 注文ID */}
                             {tx.order_id && (
