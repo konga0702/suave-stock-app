@@ -294,7 +294,11 @@ export function InventoryPage() {
           {processedRows.map((row) => (
             <Card
               key={row.product_id}
-              className="border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer bg-white dark:bg-white/[0.03]"
+              className={`border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${
+                row.netStock > 0
+                  ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-800/40'
+                  : 'bg-white dark:bg-white/[0.03] border-border/40'
+              }`}
               onClick={() => navigate(`/inventory/${row.product_id}`)}
             >
               <CardContent className="p-4">
