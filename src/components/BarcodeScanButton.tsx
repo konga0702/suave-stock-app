@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from '@/components/BarcodeScanner'
@@ -16,54 +17,51 @@ interface BarcodeScanButtonProps {
  * 安全にオーバーレイを閉じて (setOpen(false)) コンポーネントをアンマウントできる。
  * 念のため 100ms の遅延を入れて React 描画サイクルとの干渉を防ぐ。
  *
- * 【iOS スクロールズレ対策】
- * iOS Safari では position:fixed のオーバーレイがスクロール量だけ下にズレる問題がある。
- * モーダルを開く際に body を position:fixed で固定し、閉じる際にスクロール位置を復元することで対処。
+ * 【iOS スクロールズレの根本原因と対策】
+ * Layout.tsx の <main className="overflow-y-auto"> 内に position:fixed を置くと、
+ * iOS Safari では固定がビューポート基準ではなくスクロールコンテナ基準になるため、
+ * スクロール量だけオーバーレイが下にズレて表示される。
+ *
+ * → createPortal で <body> 直下にオーバーレイをレンダリングすることで
+ *   overflow:auto な親コンテナの影響を完全に回避する。
+ * → 加えて、開いている間は <main> のスクロールを止めて背景が動かないようにする。
  */
 export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps) {
   const [open, setOpen] = useState(false)
   const receivedRef = useRef(false)
-  const scrollYRef = useRef(0)
+  const mainScrollTopRef = useRef(0)
 
-  /** body を固定してスクロールズレを防ぐ */
-  const lockBodyScroll = () => {
-    scrollYRef.current = window.scrollY
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollYRef.current}px`
-    document.body.style.width = '100%'
-    document.body.style.overflowY = 'scroll'
-  }
+  /** スクロールコンテナ（<main>）を取得する */
+  const getMainEl = (): HTMLElement | null =>
+    document.querySelector('main')
 
-  /** body の固定を解除し、スクロール位置を復元する */
-  const unlockBodyScroll = () => {
-    document.body.style.position = ''
-    document.body.style.top = ''
-    document.body.style.width = ''
-    document.body.style.overflowY = ''
-    window.scrollTo(0, scrollYRef.current)
-  }
-
+  /** カメラを開く：<main> のスクロールを止める */
   const handleOpen = () => {
     receivedRef.current = false
-    lockBodyScroll()
+    const main = getMainEl()
+    if (main) {
+      mainScrollTopRef.current = main.scrollTop
+      main.style.overflow = 'hidden'
+    }
     setOpen(true)
   }
 
+  /** カメラを閉じる：<main> のスクロールを復元する */
   const handleClose = () => {
-    unlockBodyScroll()
+    const main = getMainEl()
+    if (main) {
+      main.style.overflow = ''
+      main.scrollTop = mainScrollTopRef.current
+    }
     setOpen(false)
-    console.log('[BarcodeScanButton] overlay closed')
   }
 
   const handleScan = (value: string) => {
-    // 二重呼び出し防止
     if (receivedRef.current) return
     receivedRef.current = true
 
     console.log('[BarcodeScanButton] received:', value)
 
-    // この時点で BarcodeScanner 内のカメラは既に stop() 完了済み。
-    // 1) まず値を親コンポーネントの State にセット
     try {
       onScan(value)
       console.log('[BarcodeScanButton] onScan 完了')
@@ -71,8 +69,7 @@ export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps)
       console.error('[BarcodeScanButton] onScan error:', e)
     }
 
-    // 2) 100ms 待ってからオーバーレイを閉じる (アンマウント)
-    //    → BarcodeScanner の cleanup が走っても scanner は既に停止済みなので安全
+    // 100ms 待ってからオーバーレイを閉じる
     setTimeout(() => {
       handleClose()
     }, 100)
@@ -91,7 +88,8 @@ export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps)
         <Camera className="h-4 w-4" />
       </Button>
 
-      {open && (
+      {/* createPortal で <body> 直下にマウント → overflow:auto な親の影響を受けない */}
+      {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm">
             <BarcodeScanner
@@ -99,7 +97,8 @@ export function BarcodeScanButton({ onScan, className }: BarcodeScanButtonProps)
               onClose={handleClose}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
