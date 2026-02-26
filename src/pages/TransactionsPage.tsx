@@ -1024,8 +1024,12 @@ export function TransactionsPage() {
                 return selectMode ? (
                   <Card
                     key={tx.id}
-                    className={`border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md ${
-                      selectedIds.has(tx.id) ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20 border-sky-300' : 'bg-white dark:bg-white/[0.03]'
+                    className={`border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md ${
+                      selectedIds.has(tx.id)
+                        ? 'ring-2 ring-sky-400 dark:ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20 border-sky-300'
+                        : isIN
+                          ? 'bg-sky-50/60 dark:bg-sky-950/20 border-sky-200/70 dark:border-sky-800/40'
+                          : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-800/40'
                     }`}
                     onClick={() => toggleSelect(tx.id)}
                   >
@@ -1119,7 +1123,11 @@ export function TransactionsPage() {
                   </Card>
                 ) : (
                   <Link key={tx.id} to={`/transactions/${tx.id}`}>
-                    <Card className="border border-border/40 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white dark:bg-white/[0.03]">
+                    <Card className={`border shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
+                      isIN
+                        ? 'bg-sky-50/60 dark:bg-sky-950/20 border-sky-200/70 dark:border-sky-800/40'
+                        : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-800/40'
+                    }`}>
                       <CardContent className="p-4">
                         {/* ヘッダー行: アイコン + タイプ+日付 + 件数バッジ */}
                         <div className="flex items-center justify-between mb-3">

@@ -336,7 +336,7 @@ export function NetStockPage() {
           {processedRows.map((row) => (
             <Card
               key={row.product_id}
-              className="border-0 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md cursor-pointer"
+              className="border border-emerald-200/70 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm shadow-slate-200/50 dark:shadow-none transition-all duration-200 hover:shadow-md cursor-pointer"
               onClick={() => navigate(`/products/${row.product_id}/edit`)}
             >
               <CardContent className="p-0">
