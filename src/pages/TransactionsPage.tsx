@@ -1095,15 +1095,11 @@ export function TransactionsPage() {
                           )}
                           {/* 商品名 */}
                           {tx.firstProductName && (
-                            <p className="text-sm font-semibold text-black dark:text-white leading-snug line-clamp-2 mb-2">{tx.firstProductName}</p>
+                            <p className="text-sm font-semibold text-black dark:text-white leading-snug line-clamp-2 mb-1">{tx.firstProductName}</p>
                           )}
-                          {/* 取引先（IN: 小さく / OUT: 赤背景で強調） */}
-                          {tx.partner_name && (
-                            <p className={isIN ? 'text-sm text-muted-foreground truncate mb-1' : 'font-bold text-red-900 dark:text-red-300 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-2 truncate'}>{tx.partner_name}</p>
-                          )}
-                          {/* 注文コード（IN: 青背景で強調 / OUT: 小さく） */}
+                          {/* 発注コード（IN: 青背景 / OUT: 赤背景） */}
                           {tx.order_code && (
-                            <p className={`font-mono truncate ${isIN ? 'text-lg font-bold text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded mt-2' : 'text-[11px] text-muted-foreground/60 mt-0.5'}`}>{tx.order_code}</p>
+                            <p className={`font-mono text-lg font-bold truncate mt-1 px-2 py-1 rounded ${isIN ? 'text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40' : 'text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40'}`}>{tx.order_code}</p>
                           )}
                           {/* 発注コード */}
                           {tx.purchase_order_code && (
@@ -1179,17 +1175,13 @@ export function TransactionsPage() {
                             )}
                             {/* 商品名 */}
                             {tx.firstProductName && (
-                              <p className="text-sm font-semibold text-black dark:text-white leading-snug line-clamp-2 mb-2">
+                              <p className="text-sm font-semibold text-black dark:text-white leading-snug line-clamp-2 mb-1">
                                 {tx.firstProductName}
                               </p>
                             )}
-                            {/* 取引先（IN: 小さく / OUT: 赤背景で強調） */}
-                            {tx.partner_name && (
-                              <p className={isIN ? 'text-sm text-muted-foreground truncate mb-1' : 'font-bold text-red-900 dark:text-red-300 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-2 truncate'}>{tx.partner_name}</p>
-                            )}
-                            {/* 注文コード（IN: 青背景で強調 / OUT: 小さく） */}
+                            {/* 発注コード（IN: 青背景 / OUT: 赤背景） */}
                             {tx.order_code && (
-                              <p className={`font-mono truncate ${isIN ? 'text-lg font-bold text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded mt-2' : 'text-[11px] text-muted-foreground/60 mt-0.5'}`}>{tx.order_code}</p>
+                              <p className={`font-mono text-lg font-bold truncate mt-1 px-2 py-1 rounded ${isIN ? 'text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40' : 'text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40'}`}>{tx.order_code}</p>
                             )}
                             {/* 発注コード */}
                             {tx.purchase_order_code && (
