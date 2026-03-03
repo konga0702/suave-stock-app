@@ -1097,9 +1097,13 @@ export function TransactionsPage() {
                           {tx.firstProductName && (
                             <p className="text-sm font-semibold text-black dark:text-white leading-snug line-clamp-2 mb-1">{tx.firstProductName}</p>
                           )}
-                          {/* 発注コード（IN: 青背景 / OUT: 赤背景） */}
+                          {/* 出荷: 顧客名（赤背景で強調） */}
+                          {!isIN && tx.customer_name && (
+                            <p className="text-xl font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
+                          )}
+                          {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
                           {tx.order_code && (
-                            <p className={`font-mono text-lg font-bold truncate mt-1 px-2 py-1 rounded ${isIN ? 'text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40' : 'text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40'}`}>{tx.order_code}</p>
+                            <p className={`font-mono font-bold truncate mt-1 ${isIN ? 'text-lg text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded' : 'text-base text-red-800 dark:text-red-300'}`}>{tx.order_code}</p>
                           )}
                           {/* 発注コード */}
                           {tx.purchase_order_code && (
@@ -1179,9 +1183,13 @@ export function TransactionsPage() {
                                 {tx.firstProductName}
                               </p>
                             )}
-                            {/* 発注コード（IN: 青背景 / OUT: 赤背景） */}
+                            {/* 出荷: 顧客名（赤背景で強調） */}
+                            {!isIN && tx.customer_name && (
+                              <p className="text-xl font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
+                            )}
+                            {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
                             {tx.order_code && (
-                              <p className={`font-mono text-lg font-bold truncate mt-1 px-2 py-1 rounded ${isIN ? 'text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40' : 'text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40'}`}>{tx.order_code}</p>
+                              <p className={`font-mono font-bold truncate mt-1 ${isIN ? 'text-lg text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded' : 'text-base text-red-800 dark:text-red-300'}`}>{tx.order_code}</p>
                             )}
                             {/* 発注コード */}
                             {tx.purchase_order_code && (
