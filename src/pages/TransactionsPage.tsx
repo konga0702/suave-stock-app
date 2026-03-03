@@ -1099,7 +1099,7 @@ export function TransactionsPage() {
                           )}
                           {/* 出荷: 顧客名（赤背景で強調） */}
                           {!isIN && tx.customer_name && (
-                            <p className="text-xl font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
+                            <p className="text-lg font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
                           )}
                           {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
                           {tx.order_code && (
@@ -1185,7 +1185,7 @@ export function TransactionsPage() {
                             )}
                             {/* 出荷: 顧客名（赤背景で強調） */}
                             {!isIN && tx.customer_name && (
-                              <p className="text-xl font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
+                              <p className="text-lg font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
                             )}
                             {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
                             {tx.order_code && (
