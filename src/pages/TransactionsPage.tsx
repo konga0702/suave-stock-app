@@ -1089,7 +1089,7 @@ export function TransactionsPage() {
                         <div className="flex-1 min-w-0">
                           {/* 管理番号: 商品名の上に目立つ表示 */}
                           {tx.tracking_number && (
-                            <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate mb-1">
+                            <p className="font-mono text-xl font-bold text-gray-900 dark:text-white truncate mb-1">
                               {tx.tracking_number}
                             </p>
                           )}
@@ -1099,11 +1099,11 @@ export function TransactionsPage() {
                           )}
                           {/* 取引先 */}
                           {tx.partner_name && (
-                            <p className="text-xs text-muted-foreground truncate">{tx.partner_name}</p>
+                            <p className={`truncate ${isIN ? 'text-sm text-muted-foreground' : 'text-xl font-bold text-gray-900 dark:text-white mt-1'}`}>{tx.partner_name}</p>
                           )}
                           {/* 注文コード */}
                           {tx.order_code && (
-                            <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
+                            <p className={`font-mono truncate ${isIN ? 'text-lg font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/40 px-2 py-0.5 rounded mt-1' : 'text-[11px] text-muted-foreground/60 mt-0.5'}`}>{tx.order_code}</p>
                           )}
                           {/* 発注コード */}
                           {tx.purchase_order_code && (
@@ -1173,7 +1173,7 @@ export function TransactionsPage() {
                           <div className="flex-1 min-w-0">
                             {/* 管理番号: 商品名の上に目立つ表示 */}
                             {tx.tracking_number && (
-                              <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate mb-1">
+                              <p className="font-mono text-xl font-bold text-gray-900 dark:text-white truncate mb-1">
                                 {tx.tracking_number}
                               </p>
                             )}
@@ -1185,11 +1185,11 @@ export function TransactionsPage() {
                             )}
                             {/* 取引先 */}
                             {tx.partner_name && (
-                              <p className="text-xs text-muted-foreground truncate">{tx.partner_name}</p>
+                              <p className={`truncate ${isIN ? 'text-sm text-muted-foreground' : 'text-xl font-bold text-gray-900 dark:text-white mt-1'}`}>{tx.partner_name}</p>
                             )}
                             {/* 注文コード */}
                             {tx.order_code && (
-                              <p className="font-mono text-[11px] text-muted-foreground/60 truncate mt-0.5">{tx.order_code}</p>
+                              <p className={`font-mono truncate ${isIN ? 'text-lg font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/40 px-2 py-0.5 rounded mt-1' : 'text-[11px] text-muted-foreground/60 mt-0.5'}`}>{tx.order_code}</p>
                             )}
                             {/* 発注コード */}
                             {tx.purchase_order_code && (
