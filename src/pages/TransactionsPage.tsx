@@ -1101,12 +1101,20 @@ export function TransactionsPage() {
                           {!isIN && tx.customer_name && (
                             <p className="text-lg font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
                           )}
-                          {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
-                          {tx.order_code && (
-                            <p className={`font-mono font-bold truncate mt-1 ${isIN ? 'text-lg text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded' : 'text-base text-red-800 dark:text-red-300'}`}>{tx.order_code}</p>
+                          {/* IN: 発注コード（purchase_order_code）を青背景で強調 */}
+                          {isIN && tx.purchase_order_code && (
+                            <p className="font-mono text-lg font-bold truncate mt-1 text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded">{tx.purchase_order_code}</p>
                           )}
-                          {/* 発注コード */}
-                          {tx.purchase_order_code && (
+                          {/* OUT: 注文コード（order_code）を赤太字 */}
+                          {!isIN && tx.order_code && (
+                            <p className="font-mono text-base font-bold truncate mt-1 text-red-800 dark:text-red-300">{tx.order_code}</p>
+                          )}
+                          {/* IN: 注文コード（order_code）をサブ表示 */}
+                          {isIN && tx.order_code && (
+                            <p className="font-mono text-[11px] text-pink-500/80 dark:text-pink-400/70 truncate mt-0.5">注文: {tx.order_code}</p>
+                          )}
+                          {/* OUT: 発注コード（purchase_order_code）をサブ表示 */}
+                          {!isIN && tx.purchase_order_code && (
                             <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">発注: {tx.purchase_order_code}</p>
                           )}
                           {/* 注文ID */}
@@ -1187,12 +1195,20 @@ export function TransactionsPage() {
                             {!isIN && tx.customer_name && (
                               <p className="text-lg font-bold text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded mt-1 truncate">{tx.customer_name}</p>
                             )}
-                            {/* 発注コード（IN: 青背景 / OUT: 赤太字） */}
-                            {tx.order_code && (
-                              <p className={`font-mono font-bold truncate mt-1 ${isIN ? 'text-lg text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded' : 'text-base text-red-800 dark:text-red-300'}`}>{tx.order_code}</p>
+                            {/* IN: 発注コード（purchase_order_code）を青背景で強調 */}
+                            {isIN && tx.purchase_order_code && (
+                              <p className="font-mono text-lg font-bold truncate mt-1 text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded">{tx.purchase_order_code}</p>
                             )}
-                            {/* 発注コード */}
-                            {tx.purchase_order_code && (
+                            {/* OUT: 注文コード（order_code）を赤太字 */}
+                            {!isIN && tx.order_code && (
+                              <p className="font-mono text-base font-bold truncate mt-1 text-red-800 dark:text-red-300">{tx.order_code}</p>
+                            )}
+                            {/* IN: 注文コード（order_code）をサブ表示 */}
+                            {isIN && tx.order_code && (
+                              <p className="font-mono text-[11px] text-pink-500/80 dark:text-pink-400/70 truncate mt-0.5">注文: {tx.order_code}</p>
+                            )}
+                            {/* OUT: 発注コード（purchase_order_code）をサブ表示 */}
+                            {!isIN && tx.purchase_order_code && (
                               <p className="font-mono text-[11px] text-amber-600/80 dark:text-amber-400/70 truncate mt-0.5">発注: {tx.purchase_order_code}</p>
                             )}
                             {/* 注文ID */}
