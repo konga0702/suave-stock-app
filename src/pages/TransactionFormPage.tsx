@@ -193,6 +193,10 @@ export function TransactionFormPage() {
       toast.error('明細を追加してください')
       return
     }
+    if (!date) {
+      toast.error('日付を入力してください')
+      return
+    }
     setSaving(true)
     try {
       // 商品コードが入力・変更された場合、productsテーブルも更新
@@ -407,13 +411,27 @@ export function TransactionFormPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground" htmlFor="date">日付</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                {date && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 rounded-xl border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    onClick={() => setDate('')}
+                    title="日付をクリア"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* 管理番号（③から移動） */}
@@ -753,13 +771,27 @@ export function TransactionFormPage() {
                 <CalendarDays className="h-3 w-3 text-teal-500" />
                 <Label className="text-xs text-muted-foreground" htmlFor="orderDate">注文日</Label>
               </div>
-              <Input
-                id="orderDate"
-                type="date"
-                value={orderDate}
-                onChange={(e) => setOrderDate(e.target.value)}
-                className="rounded-xl bg-white dark:bg-white/5 border-border/60"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="orderDate"
+                  type="date"
+                  value={orderDate}
+                  onChange={(e) => setOrderDate(e.target.value)}
+                  className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
+                />
+                {orderDate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 rounded-xl border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    onClick={() => setOrderDate('')}
+                    title="注文日をクリア"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
