@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Package, ArrowDownToLine, ArrowUpFromLine, Search, X, ArrowUpDown, Filter,
 } from 'lucide-react'
@@ -41,11 +41,20 @@ const FILTER_OPTIONS: { key: StockFilter; label: string }[] = [
 
 export function InventoryPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<NetStockRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('net_desc')
-  const [stockFilter, setStockFilter] = useState<StockFilter>('all')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const s = searchParams.get('sort')
+    const valid: SortKey[] = ['name_asc', 'name_desc', 'net_desc', 'net_asc', 'in_desc', 'out_desc']
+    return valid.includes(s as SortKey) ? (s as SortKey) : 'net_desc'
+  })
+  const [stockFilter, setStockFilter] = useState<StockFilter>(() => {
+    const f = searchParams.get('filter')
+    const valid: StockFilter[] = ['all', 'positive', 'negative', 'zero', 'has_in', 'has_out']
+    return valid.includes(f as StockFilter) ? (f as StockFilter) : 'all'
+  })
   const [showSortPanel, setShowSortPanel] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
 
@@ -99,6 +108,20 @@ export function InventoryPage() {
     }
     load()
   }, [])
+
+  // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (search) next.set('q', search); else next.delete('q')
+        if (sortKey !== 'net_desc') next.set('sort', sortKey); else next.delete('sort')
+        if (stockFilter !== 'all') next.set('filter', stockFilter); else next.delete('filter')
+        return next
+      },
+      { replace: true },
+    )
+  }, [search, sortKey, stockFilter, setSearchParams])
 
   const processedRows = useMemo(() => {
     let result = rows.filter((r) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Search, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,15 +46,24 @@ const stockFilterOptions: { key: StockFilter; label: string }[] = [
 ]
 
 export function ProductsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [stockFilter, setStockFilter] = useState<StockFilter>('all')
-  const [supplierFilter, setSupplierFilter] = useState<string>('all')
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const s = searchParams.get('sort')
+    const valid: SortKey[] = ['name', 'stock_desc', 'stock_asc', 'cost_desc', 'cost_asc', 'selling_desc', 'selling_asc']
+    return valid.includes(s as SortKey) ? (s as SortKey) : 'name'
+  })
+  const [stockFilter, setStockFilter] = useState<StockFilter>(() => {
+    const f = searchParams.get('stock')
+    const valid: StockFilter[] = ['all', 'in_stock', 'low_stock', 'out_of_stock']
+    return valid.includes(f as StockFilter) ? (f as StockFilter) : 'all'
+  })
+  const [supplierFilter, setSupplierFilter] = useState<string>(() => searchParams.get('supplier') ?? 'all')
   const [showSortFilter, setShowSortFilter] = useState(false)
 
   const loadProducts = useCallback(async () => {
@@ -68,6 +77,21 @@ export function ProductsPage() {
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
+
+  // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (search) next.set('q', search); else next.delete('q')
+        if (sortKey !== 'name') next.set('sort', sortKey); else next.delete('sort')
+        if (stockFilter !== 'all') next.set('stock', stockFilter); else next.delete('stock')
+        if (supplierFilter !== 'all') next.set('supplier', supplierFilter); else next.delete('supplier')
+        return next
+      },
+      { replace: true },
+    )
+  }, [search, sortKey, stockFilter, supplierFilter, setSearchParams])
 
   // 仕入れ先一覧を取得
   const suppliers = useMemo(() => {
@@ -304,8 +328,18 @@ export function ProductsPage() {
             onChange={(e) => setSearch(e.target.value)}
             inputMode="text"
             enterKeyHint="done"
-            className="rounded-xl pl-9 bg-white dark:bg-white/5 border-border/60 focus:border-slate-400 transition-colors"
+            className="rounded-xl pl-9 pr-9 bg-white dark:bg-white/5 border-border/60 focus:border-slate-400 transition-colors"
           />
+          {search && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
+              onClick={() => setSearch('')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
         <Button
           variant="outline"
