@@ -194,7 +194,7 @@ export function TransactionDetailPage() {
     <div className="page-transition space-y-4">
       {/* ヘッダー */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate('/transactions')}>
+        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-accent transition-colors" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-bold tracking-tight">入出庫詳細</h1>
