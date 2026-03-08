@@ -121,9 +121,9 @@ const categoryFilterOptions: { key: CategoryFilter; label: string }[] = [
 ]
 
 export function TransactionsPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [transactions, setTransactions] = useState<TxWithProducts[]>([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [tab, setTab] = useState(() => {
     const s = searchParams.get('status')
     return s === 'COMPLETED' || s === 'SCHEDULED' ? s : 'SCHEDULED'
@@ -134,18 +134,29 @@ export function TransactionsPage() {
   })
 
   // カテゴリ絞り込み（クラプロ仕様：入荷/出荷/移動/棚卸/全部）
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(() => {
+    const c = searchParams.get('category')
+    return (c === '入荷' || c === '出荷' || c === '移動' || c === '棚卸') ? c : 'all'
+  })
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
 
   // 日付フィルター
-  const [datePreset, setDatePreset] = useState<DatePreset>('all')
-  const [customDateFrom, setCustomDateFrom] = useState('')
-  const [customDateTo, setCustomDateTo] = useState('')
+  const [datePreset, setDatePreset] = useState<DatePreset>(() => {
+    const d = searchParams.get('date_preset')
+    const validPresets: DatePreset[] = ['all', 'this_month', 'this_year', 'last_month', 'last_year', 'last_30', 'last_90', 'custom']
+    return validPresets.includes(d as DatePreset) ? (d as DatePreset) : 'all'
+  })
+  const [customDateFrom, setCustomDateFrom] = useState(() => searchParams.get('date_from') ?? '')
+  const [customDateTo, setCustomDateTo] = useState(() => searchParams.get('date_to') ?? '')
   const [showDateFilter, setShowDateFilter] = useState(false)
 
   // ソート・フィルター
-  const [sortKey, setSortKey] = useState<SortKey>('date_desc')
-  const [partnerFilter, setPartnerFilter] = useState<string>('all')
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const s = searchParams.get('sort')
+    const validKeys: SortKey[] = ['date_desc', 'date_asc', 'amount_desc', 'amount_asc', 'partner', 'category']
+    return validKeys.includes(s as SortKey) ? (s as SortKey) : 'date_desc'
+  })
+  const [partnerFilter, setPartnerFilter] = useState<string>(() => searchParams.get('partner') ?? 'all')
   const [showSortFilter, setShowSortFilter] = useState(false)
 
   // CSVエクスポート進捗
@@ -340,6 +351,30 @@ export function TransactionsPage() {
   useEffect(() => {
     setDisplayCount(100)
   }, [tab, search, typeFilter, categoryFilter, partnerFilter, sortKey, datePreset, customDateFrom, customDateTo])
+
+  // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        // 検索キーワード
+        if (search) next.set('q', search); else next.delete('q')
+        // カテゴリフィルター
+        if (categoryFilter !== 'all') next.set('category', categoryFilter); else next.delete('category')
+        // ソートキー
+        if (sortKey !== 'date_desc') next.set('sort', sortKey); else next.delete('sort')
+        // 取引先フィルター
+        if (partnerFilter !== 'all') next.set('partner', partnerFilter); else next.delete('partner')
+        // 日付プリセット
+        if (datePreset !== 'all') next.set('date_preset', datePreset); else next.delete('date_preset')
+        // カスタム日付範囲
+        if (customDateFrom) next.set('date_from', customDateFrom); else next.delete('date_from')
+        if (customDateTo) next.set('date_to', customDateTo); else next.delete('date_to')
+        return next
+      },
+      { replace: true },
+    )
+  }, [search, categoryFilter, sortKey, partnerFilter, datePreset, customDateFrom, customDateTo, setSearchParams])
 
   const handleImport = async () => {
     const input = document.createElement('input')
