@@ -84,6 +84,17 @@ export function ProductsPage() {
   }, [loadProducts])
 
   useEffect(() => {
+    // ProductFormPage などから `/products` にクリーン遷移した場合の復元フォールバック
+    const querySearch = new URLSearchParams(window.location.search).get('q')
+    if (querySearch !== null) return
+
+    const savedSearch = sessionStorage.getItem(SEARCH_STORAGE_KEY)
+    if (!savedSearch) return
+
+    setSearch((prev) => (prev ? prev : savedSearch))
+  }, [])
+
+  useEffect(() => {
     if (search) {
       sessionStorage.setItem(SEARCH_STORAGE_KEY, search)
     } else {
