@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste, Camera, ImagePlus, X, Hash, Building2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Package, Barcode, Boxes, JapaneseYen, FileText, ClipboardPaste, Camera, ImagePlus, X, Hash, Building2, Copy } from 'lucide-react'
 import { BarcodeScanButton } from '@/components/BarcodeScanButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,7 @@ export function ProductFormPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -217,6 +218,39 @@ export function ProductFormPage() {
       navigate('/products')
     } catch {
       toast.error('削除に失敗しました')
+    }
+  }
+
+  const handleDuplicate = async () => {
+    if (!name.trim()) {
+      toast.error('商品名を入力してください')
+      return
+    }
+
+    setDuplicating(true)
+    try {
+      const payload = {
+        name: name.trim(),
+        product_code: productCode.trim() || null,
+        internal_barcode: barcode.trim() || null,
+        image_url: imageUrl,
+        cost_price: parseInt(costPrice) || 0,
+        selling_price: parseInt(sellingPrice) || 0,
+        supplier: supplier.trim() || null,
+        current_stock: parseInt(stock) || 0,
+        default_unit_price: parseInt(costPrice) || 0,
+        memo: memo.trim() || null,
+      }
+
+      const { error } = await supabase.from('products').insert(payload)
+      if (error) throw error
+
+      toast.success('商品を複製して登録しました')
+      navigate('/products')
+    } catch {
+      toast.error('複製に失敗しました')
+    } finally {
+      setDuplicating(false)
     }
   }
 
@@ -558,15 +592,27 @@ export function ProductFormPage() {
           </CardContent>
         </Card>
 
-        {/* 保存ボタン */}
-        <Button
-          className="w-full rounded-2xl shadow-lg h-12 text-[13px] font-semibold bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all duration-300"
-          size="lg"
-          onClick={handleSave}
-          disabled={saving || uploading}
-        >
-          {uploading ? '画像アップロード中...' : saving ? '保存中...' : isEdit ? '更新する' : '登録する'}
-        </Button>
+        {/* 保存・複製ボタン */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            className="rounded-2xl h-12 text-[13px] font-semibold border-border/60"
+            size="lg"
+            onClick={handleDuplicate}
+            disabled={saving || uploading || duplicating}
+          >
+            <Copy className="mr-1.5 h-4 w-4" />
+            {duplicating ? '複製中...' : '複製して登録'}
+          </Button>
+          <Button
+            className="rounded-2xl shadow-lg h-12 text-[13px] font-semibold bg-slate-800 text-white shadow-slate-800/20 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 transition-all duration-300"
+            size="lg"
+            onClick={handleSave}
+            disabled={saving || uploading || duplicating}
+          >
+            {uploading ? '画像アップロード中...' : saving ? '保存中...' : isEdit ? '更新する' : '登録する'}
+          </Button>
+        </div>
       </div>
     </div>
   )
