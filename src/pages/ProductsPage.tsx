@@ -27,6 +27,7 @@ import type { Product } from '@/types/database'
 
 type SortKey = 'name' | 'stock_desc' | 'stock_asc' | 'cost_desc' | 'cost_asc' | 'selling_desc' | 'selling_asc'
 type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+const SEARCH_STORAGE_KEY = 'products_page_search'
 
 const sortOptions: { key: SortKey; label: string }[] = [
   { key: 'name', label: '名前順' },
@@ -48,7 +49,11 @@ const stockFilterOptions: { key: StockFilter; label: string }[] = [
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [search, setSearch] = useState(() => {
+    const querySearch = searchParams.get('q')
+    if (querySearch !== null) return querySearch
+    return sessionStorage.getItem(SEARCH_STORAGE_KEY) ?? ''
+  })
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -77,6 +82,14 @@ export function ProductsPage() {
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
+
+  useEffect(() => {
+    if (search) {
+      sessionStorage.setItem(SEARCH_STORAGE_KEY, search)
+    } else {
+      sessionStorage.removeItem(SEARCH_STORAGE_KEY)
+    }
+  }, [search])
 
   // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
   useEffect(() => {
@@ -335,6 +348,8 @@ export function ProductsPage() {
               variant="ghost"
               size="icon"
               className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg text-muted-foreground/60 hover:text-foreground"
+              type="button"
+              aria-label="検索をクリア"
               onClick={() => setSearch('')}
             >
               <X className="h-3.5 w-3.5" />
