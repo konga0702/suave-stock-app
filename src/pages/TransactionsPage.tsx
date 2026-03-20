@@ -110,7 +110,7 @@ function getDateRangeForPreset(preset: DatePreset): DateRange {
 }
 
 // カテゴリ絞り込みの選択肢
-type CategoryFilter = 'all' | '入荷' | '出荷' | '移動' | '棚卸'
+type CategoryFilter = 'all' | '入荷' | '出荷' | '移動' | '棚卸' | '廃棄'
 
 const categoryFilterOptions: { key: CategoryFilter; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -118,6 +118,7 @@ const categoryFilterOptions: { key: CategoryFilter; label: string }[] = [
   { key: '出荷', label: '出荷' },
   { key: '移動', label: '移動' },
   { key: '棚卸', label: '棚卸' },
+  { key: '廃棄', label: '廃棄' },
 ]
 
 export function TransactionsPage() {

@@ -1,7 +1,7 @@
 export type TransactionType = 'IN' | 'OUT'
 export type TransactionStatus = 'SCHEDULED' | 'COMPLETED'
 export type InCategory = '入荷' | '返品' | '棚卸'
-export type OutCategory = '出荷' | '再送' | '棚卸'
+export type OutCategory = '出荷' | '再送' | '棚卸' | '廃棄'
 export type TransactionCategory = InCategory | OutCategory
 
 export interface Product {

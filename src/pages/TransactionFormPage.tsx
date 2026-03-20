@@ -31,7 +31,7 @@ interface ItemRow {
 }
 
 const IN_CATEGORIES: TransactionCategory[] = ['入荷', '返品', '棚卸']
-const OUT_CATEGORIES: TransactionCategory[] = ['出荷', '再送', '棚卸']
+const OUT_CATEGORIES: TransactionCategory[] = ['出荷', '再送', '棚卸', '廃棄']
 
 export function TransactionFormPage() {
   const navigate = useNavigate()
