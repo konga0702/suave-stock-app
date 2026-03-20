@@ -499,16 +499,21 @@ export function TransactionsPage() {
 
     // 2. テキスト検索
     if (search) {
-      const q = search.toLowerCase()
+      // trim + 全角ハイフン→半角ハイフン正規化
+      const normalize = (s: string) => s.trim().toLowerCase().replace(/－/g, '-').replace(/　/g, ' ')
+      const q = normalize(search)
       result = result.filter((tx) =>
-        tx.partner_name?.toLowerCase().includes(q) ||
-        tx.tracking_number?.toLowerCase().includes(q) ||
-        tx.order_code?.toLowerCase().includes(q) ||
-        tx.shipping_code?.toLowerCase().includes(q) ||
-        tx.memo?.toLowerCase().includes(q) ||
-        tx.category?.toLowerCase().includes(q) ||
-        tx.firstProductName?.toLowerCase().includes(q) ||
-        tx.firstProductCode?.toLowerCase().includes(q) ||
+        normalize(tx.partner_name ?? '').includes(q) ||
+        normalize(tx.tracking_number ?? '').includes(q) ||
+        normalize(tx.order_code ?? '').includes(q) ||
+        normalize(tx.purchase_order_code ?? '').includes(q) ||
+        normalize(tx.shipping_code ?? '').includes(q) ||
+        normalize(tx.customer_name ?? '').includes(q) ||
+        normalize(tx.memo ?? '').includes(q) ||
+        normalize(tx.category ?? '').includes(q) ||
+        normalize(tx.order_id ?? '').includes(q) ||
+        normalize(tx.firstProductName ?? '').includes(q) ||
+        normalize(tx.firstProductCode ?? '').includes(q) ||
         (tx.type === 'IN' ? '入庫' : '出庫').includes(q)
       )
     }
