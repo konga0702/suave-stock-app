@@ -74,6 +74,32 @@ git push origin main
 # → Vercel が自動でビルド・デプロイ
 ```
 
+## タスク完了後の報告ルール（必須）
+
+タスクが完了したら、必ず `prompt.md` の「実行報告」セクションを以下の形式で埋めること。
+
+```
+# 実行報告
+
+> 完了日時：YYYY-MM-DD HH:MM
+> コミット：<コミットハッシュ> <コミットメッセージ>
+
+## 実施した内容
+- 何をどのように実装したか
+
+## 変更・作成したファイル
+- src/pages/XXX.tsx → 何を変更したか
+- src/hooks/XXX.ts → 新規作成、内容
+
+## 動作確認ポイント
+- 確認すべき動作・注意点
+
+## 次回PMへの申し送り事項
+- 次のタスクに影響する情報・残課題
+```
+
+報告を書いた後に `prompt.md` を保存すること。
+
 ## 注意事項
 - `src/lib/inventory.ts` の `applyCompletedTransaction` / `revertCompletedTransaction` は
   在庫数と個体テーブルの整合性を保つ重要な関数。変更時は慎重に。
