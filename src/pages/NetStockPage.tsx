@@ -21,6 +21,7 @@ interface NetStockRow {
 
 type SortKey = 'name_asc' | 'name_desc' | 'net_desc' | 'net_asc' | 'in_desc' | 'out_desc'
 type StockFilter = 'all' | 'positive' | 'negative' | 'zero' | 'has_in' | 'has_out'
+const SEARCH_STORAGE_KEY = 'netstock_page_search'
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'name_asc', label: '商品名 A→Z' },
@@ -44,11 +45,19 @@ export function NetStockPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<NetStockRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => localStorage.getItem(SEARCH_STORAGE_KEY) ?? '')
   const [sortKey, setSortKey] = useState<SortKey>('name_asc')
   const [stockFilter, setStockFilter] = useState<StockFilter>('all')
   const [showSort, setShowSort] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
+
+  useEffect(() => {
+    if (search) {
+      localStorage.setItem(SEARCH_STORAGE_KEY, search)
+    } else {
+      localStorage.removeItem(SEARCH_STORAGE_KEY)
+    }
+  }, [search])
 
   useEffect(() => {
     async function load() {

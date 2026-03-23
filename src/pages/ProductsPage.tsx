@@ -52,7 +52,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState(() => {
     const querySearch = searchParams.get('q')
     if (querySearch !== null) return querySearch
-    return sessionStorage.getItem(SEARCH_STORAGE_KEY) ?? ''
+    return localStorage.getItem(SEARCH_STORAGE_KEY) ?? ''
   })
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -88,7 +88,7 @@ export function ProductsPage() {
     const querySearch = new URLSearchParams(window.location.search).get('q')
     if (querySearch !== null) return
 
-    const savedSearch = sessionStorage.getItem(SEARCH_STORAGE_KEY)
+    const savedSearch = localStorage.getItem(SEARCH_STORAGE_KEY)
     if (!savedSearch) return
 
     setSearch((prev) => (prev ? prev : savedSearch))
@@ -96,9 +96,9 @@ export function ProductsPage() {
 
   useEffect(() => {
     if (search) {
-      sessionStorage.setItem(SEARCH_STORAGE_KEY, search)
+      localStorage.setItem(SEARCH_STORAGE_KEY, search)
     } else {
-      sessionStorage.removeItem(SEARCH_STORAGE_KEY)
+      localStorage.removeItem(SEARCH_STORAGE_KEY)
     }
   }, [search])
 
