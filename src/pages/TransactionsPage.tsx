@@ -111,6 +111,7 @@ function getDateRangeForPreset(preset: DatePreset): DateRange {
 
 // カテゴリ絞り込みの選択肢
 type CategoryFilter = 'all' | '入荷' | '出荷' | '移動' | '棚卸' | '廃棄'
+const SEARCH_STORAGE_KEY = 'transactions_page_search'
 
 const categoryFilterOptions: { key: CategoryFilter; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -124,7 +125,7 @@ const categoryFilterOptions: { key: CategoryFilter; label: string }[] = [
 export function TransactionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [transactions, setTransactions] = useState<TxWithProducts[]>([])
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? localStorage.getItem(SEARCH_STORAGE_KEY) ?? '')
   const [tab, setTab] = useState(() => {
     const s = searchParams.get('status')
     return s === 'COMPLETED' || s === 'SCHEDULED' ? s : 'SCHEDULED'
@@ -352,6 +353,15 @@ export function TransactionsPage() {
   useEffect(() => {
     setDisplayCount(100)
   }, [tab, search, typeFilter, categoryFilter, partnerFilter, sortKey, datePreset, customDateFrom, customDateTo])
+
+  // 検索キーワードをlocalStorageに永続化（詳細操作後の直接遷移でも復元できるよう）
+  useEffect(() => {
+    if (search) {
+      localStorage.setItem(SEARCH_STORAGE_KEY, search)
+    } else {
+      localStorage.removeItem(SEARCH_STORAGE_KEY)
+    }
+  }, [search])
 
   // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
   useEffect(() => {
