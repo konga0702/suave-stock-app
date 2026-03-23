@@ -20,6 +20,7 @@ interface NetStockRow {
 
 type SortKey = 'name_asc' | 'name_desc' | 'net_desc' | 'net_asc' | 'in_desc' | 'out_desc'
 type StockFilter = 'all' | 'positive' | 'negative' | 'zero' | 'has_in' | 'has_out'
+const SEARCH_STORAGE_KEY = 'inventory_page_search'
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'name_asc', label: '商品名 A→Z' },
@@ -44,7 +45,7 @@ export function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<NetStockRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? localStorage.getItem(SEARCH_STORAGE_KEY) ?? '')
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     const s = searchParams.get('sort')
     const valid: SortKey[] = ['name_asc', 'name_desc', 'net_desc', 'net_asc', 'in_desc', 'out_desc']
@@ -108,6 +109,15 @@ export function InventoryPage() {
     }
     load()
   }, [])
+
+  // 検索キーワードをlocalStorageに永続化
+  useEffect(() => {
+    if (search) {
+      localStorage.setItem(SEARCH_STORAGE_KEY, search)
+    } else {
+      localStorage.removeItem(SEARCH_STORAGE_KEY)
+    }
+  }, [search])
 
   // フィルター状態をURLクエリパラメータに同期（戻り遷移後も状態を保持するため）
   useEffect(() => {
