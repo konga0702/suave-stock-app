@@ -379,13 +379,20 @@ export function NetStockPage() {
                       <p className="text-[9px] font-medium text-muted-foreground/60">出庫</p>
                       <p className="text-sm font-bold num-display text-amber-600 dark:text-amber-400">{row.totalOut}</p>
                     </div>
-                    <div className={`text-center min-w-[40px] rounded-lg px-2 py-1 ${
-                      row.netStock > 0
-                        ? 'bg-emerald-50 dark:bg-emerald-950/50'
-                        : row.netStock < 0
-                          ? 'bg-rose-50 dark:bg-rose-950/50'
-                          : 'bg-slate-50 dark:bg-slate-800/50'
-                    }`}>
+                    <div
+                      className={`text-center min-w-[40px] rounded-lg px-2 py-1 cursor-pointer hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-700 transition-all ${
+                        row.netStock > 0
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50'
+                          : row.netStock < 0
+                            ? 'bg-rose-50 dark:bg-rose-950/50'
+                            : 'bg-slate-50 dark:bg-slate-800/50'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/inventory/${row.product_id}?tab=units`)
+                      }}
+                      title="在庫個体を表示"
+                    >
                       <p className="text-[9px] font-medium text-muted-foreground/60">純在庫</p>
                       <p className={`text-sm font-bold num-display ${
                         row.netStock > 0

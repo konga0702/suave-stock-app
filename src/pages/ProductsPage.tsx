@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Search, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter } from 'lucide-react'
+import { Plus, Search, Upload, Download, Package, CheckSquare, Square, CheckCheck, Trash2, X, ArrowUpDown, Filter, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
 import { exportProductsCsv, importProductsCsv } from '@/lib/csv'
+import { fetchBookNetStockMap } from '@/lib/stockMetrics'
 import { toast } from 'sonner'
 import type { Product } from '@/types/database'
 
@@ -49,6 +50,7 @@ const stockFilterOptions: { key: StockFilter; label: string }[] = [
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
+  const [bookNetStockMap, setBookNetStockMap] = useState<Map<string, number>>(new Map())
   const [search, setSearch] = useState(() => {
     const querySearch = searchParams.get('q')
     if (querySearch !== null) return querySearch
@@ -72,11 +74,12 @@ export function ProductsPage() {
   const [showSortFilter, setShowSortFilter] = useState(false)
 
   const loadProducts = useCallback(async () => {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .order('name')
+    const [{ data }, bookMap] = await Promise.all([
+      supabase.from('products').select('*').order('name'),
+      fetchBookNetStockMap(),
+    ])
     if (data) setProducts(data)
+    setBookNetStockMap(bookMap)
   }, [])
 
   useEffect(() => {
@@ -199,7 +202,7 @@ export function ProductsPage() {
   }
 
   const getStockColor = (stock: number) => {
-    if (stock === 0) return 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400'
+    if (stock <= 0) return 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400'
     if (stock <= 5) return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
     return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
   }
@@ -423,6 +426,23 @@ export function ProductsPage() {
         </p>
       </div>
 
+      {/* 警告バナー（マイナス在庫・帳簿不一致） */}
+      {(() => {
+        const warnCount = filteredAndSorted.filter((p) => {
+          const bookNet = bookNetStockMap.get(p.id)
+          return p.current_stock < 0 || (bookNet !== undefined && bookNet !== p.current_stock)
+        }).length
+        if (warnCount === 0) return null
+        return (
+          <div className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-3 py-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+            <p className="text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+              要確認: {warnCount}件（マイナス在庫または帳簿と不一致）
+            </p>
+          </div>
+        )
+      })()}
+
       {/* 商品リスト */}
       <div className="space-y-2">
         {filteredAndSorted.length === 0 ? (
@@ -478,14 +498,29 @@ export function ProductsPage() {
                       <span className="text-amber-600 dark:text-amber-400 font-semibold num-display">売¥{Number(product.selling_price ?? 0).toLocaleString()}</span>
                     </div>
                   </div>
-                  {!selectMode && (
-                    <div className={`rounded-xl px-3 py-1.5 text-center ${getStockColor(product.current_stock)}`}>
-                      <div className="text-base font-bold leading-tight num-display">
-                        {product.current_stock}
+                  {!selectMode && (() => {
+                    const bookNet = bookNetStockMap.get(product.id)
+                    const isMismatch = bookNet !== undefined && bookNet !== product.current_stock
+                    const isNegative = product.current_stock < 0
+                    const badgeClass = isNegative
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 ring-1 ring-rose-300 dark:ring-rose-800'
+                      : isMismatch
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 ring-1 ring-amber-300 dark:ring-amber-800'
+                        : getStockColor(product.current_stock)
+                    return (
+                      <div className={`rounded-xl px-2 py-1.5 text-center min-w-[52px] ${badgeClass}`}>
+                        <div className="text-base font-bold leading-tight num-display">
+                          {product.current_stock}
+                        </div>
+                        <div className="text-[9px] font-medium leading-tight opacity-70">在庫</div>
+                        {isMismatch && bookNet !== undefined && (
+                          <div className="text-[9px] font-medium leading-tight mt-0.5 opacity-80 num-display">
+                            帳{bookNet >= 0 ? '+' : ''}{bookNet}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[9px] font-medium leading-tight opacity-70">在庫</div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </CardContent>
               </Card>
             )
