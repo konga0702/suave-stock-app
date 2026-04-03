@@ -27,7 +27,13 @@ import { toast } from 'sonner'
 import type { Product } from '@/types/database'
 
 type SortKey = 'name' | 'stock_desc' | 'stock_asc' | 'cost_desc' | 'cost_asc' | 'selling_desc' | 'selling_asc'
-type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+type StockFilter =
+  | 'all'
+  | 'in_stock'
+  | 'low_stock'
+  | 'out_of_stock'
+  | 'stock_mismatch'
+  | 'negative_stock'
 const SEARCH_STORAGE_KEY = 'products_page_search'
 
 const sortOptions: { key: SortKey; label: string }[] = [
@@ -45,6 +51,8 @@ const stockFilterOptions: { key: StockFilter; label: string }[] = [
   { key: 'in_stock', label: '在庫あり' },
   { key: 'low_stock', label: '在庫少（5以下）' },
   { key: 'out_of_stock', label: '在庫切れ' },
+  { key: 'stock_mismatch', label: '帳簿不一致' },
+  { key: 'negative_stock', label: 'マイナス在庫' },
 ]
 
 export function ProductsPage() {
@@ -67,7 +75,14 @@ export function ProductsPage() {
   })
   const [stockFilter, setStockFilter] = useState<StockFilter>(() => {
     const f = searchParams.get('stock')
-    const valid: StockFilter[] = ['all', 'in_stock', 'low_stock', 'out_of_stock']
+    const valid: StockFilter[] = [
+      'all',
+      'in_stock',
+      'low_stock',
+      'out_of_stock',
+      'stock_mismatch',
+      'negative_stock',
+    ]
     return valid.includes(f as StockFilter) ? (f as StockFilter) : 'all'
   })
   const [supplierFilter, setSupplierFilter] = useState<string>(() => searchParams.get('supplier') ?? 'all')
@@ -149,6 +164,13 @@ export function ProductsPage() {
       result = result.filter((p) => p.current_stock > 0 && p.current_stock <= 5)
     } else if (stockFilter === 'out_of_stock') {
       result = result.filter((p) => p.current_stock === 0)
+    } else if (stockFilter === 'stock_mismatch') {
+      result = result.filter((p) => {
+        const bookNet = bookNetStockMap.get(p.id)
+        return bookNet !== undefined && bookNet !== p.current_stock
+      })
+    } else if (stockFilter === 'negative_stock') {
+      result = result.filter((p) => p.current_stock < 0)
     }
 
     // 3. 仕入れ先フィルター
@@ -179,7 +201,7 @@ export function ProductsPage() {
     })
 
     return result
-  }, [products, search, stockFilter, supplierFilter, sortKey])
+  }, [products, search, stockFilter, supplierFilter, sortKey, bookNetStockMap])
 
   const handleImport = async () => {
     const input = document.createElement('input')

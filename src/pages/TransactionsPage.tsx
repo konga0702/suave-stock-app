@@ -510,7 +510,8 @@ export function TransactionsPage() {
     // 2. テキスト検索
     if (search) {
       // trim + 全角ハイフン→半角ハイフン正規化
-      const normalize = (s: string) => s.trim().toLowerCase().replace(/－/g, '-').replace(/　/g, ' ')
+      const normalize = (s: string) =>
+        s.trim().toLowerCase().replace(/\uff0d/g, '-').replace(/\u3000/g, ' ')
       const q = normalize(search)
       result = result.filter((tx) =>
         normalize(tx.partner_name ?? '').includes(q) ||

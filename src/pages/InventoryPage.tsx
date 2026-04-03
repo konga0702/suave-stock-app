@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Package, ArrowDownToLine, ArrowUpFromLine, Search, X, ArrowUpDown, Filter,
+  ScanSearch,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -171,9 +172,17 @@ export function InventoryPage() {
   return (
     <div className="page-transition space-y-4">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold tracking-tight">在庫</h1>
-        <p className="text-xs text-muted-foreground">{rows.length}商品</p>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="rounded-xl h-8 px-2.5 text-[11px] gap-1" asChild>
+            <Link to="/inventory/track">
+              <ScanSearch className="h-3.5 w-3.5" />
+              番号で追跡
+            </Link>
+          </Button>
+          <p className="text-xs text-muted-foreground whitespace-nowrap">{rows.length}商品</p>
+        </div>
       </div>
 
       {/* サマリーカード（ダッシュボードと同じ計算） */}
