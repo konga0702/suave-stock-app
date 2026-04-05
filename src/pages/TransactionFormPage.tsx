@@ -17,7 +17,11 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
-import { applyCompletedTransaction } from '@/lib/inventory'
+import {
+  applyCompletedTransaction,
+  revertCompletedTransaction,
+  transactionRowToTxInfo,
+} from '@/lib/inventory'
 import { toast } from 'sonner'
 import type { Product, TransactionType, TransactionCategory, TransactionStatus } from '@/types/database'
 
@@ -227,25 +231,88 @@ export function TransactionFormPage() {
       }
 
       if (isEdit) {
-        const { error } = await supabase
+        const { data: existingTx, error: loadTxErr } = await supabase
           .from('transactions')
-          .update(txPayload)
+          .select('*')
           .eq('id', id)
-        if (error) throw error
+          .single()
+        if (loadTxErr || !existingTx) throw loadTxErr ?? new Error('取引が見つかりません')
 
-        await supabase.from('transaction_items').delete().eq('transaction_id', id)
-        const { error: itemsError } = await supabase
+        const { data: existingItemRows } = await supabase
           .from('transaction_items')
-          .insert(
-            items.map((item) => ({
-              transaction_id: id!,
-              product_id: item.product_id,
-              quantity: item.quantity,
-              price: item.price,
-            }))
+          .select('product_id, quantity')
+          .eq('transaction_id', id)
+
+        const oldItemLines = (existingItemRows ?? []).map((row) => ({
+          product_id: row.product_id,
+          quantity: row.quantity,
+        }))
+
+        const hadCompleted = existingTx.status === 'COMPLETED'
+        let revertedForEdit = false
+        if (hadCompleted) {
+          await revertCompletedTransaction(
+            id!,
+            transactionRowToTxInfo(existingTx),
+            oldItemLines
           )
-        if (itemsError) throw itemsError
-        toast.success('入出庫データを更新しました')
+          revertedForEdit = true
+        }
+
+        try {
+          const { error } = await supabase
+            .from('transactions')
+            .update(txPayload)
+            .eq('id', id)
+          if (error) throw error
+
+          await supabase.from('transaction_items').delete().eq('transaction_id', id)
+          const { error: itemsError } = await supabase
+            .from('transaction_items')
+            .insert(
+              items.map((item) => ({
+                transaction_id: id!,
+                product_id: item.product_id,
+                quantity: item.quantity,
+                price: item.price,
+              }))
+            )
+          if (itemsError) throw itemsError
+
+          if (status === 'COMPLETED') {
+            await applyCompletedTransaction(
+              id!,
+              {
+                type,
+                date,
+                tracking_number: trackingNumber.trim() || null,
+                order_code: orderCode.trim() || null,
+                shipping_code: shippingCode.trim() || null,
+                partner_name: partnerName.trim() || null,
+              },
+              items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+            )
+          }
+        } catch (innerErr) {
+          if (revertedForEdit && hadCompleted) {
+            try {
+              await applyCompletedTransaction(
+                id!,
+                transactionRowToTxInfo(existingTx),
+                oldItemLines
+              )
+            } catch {
+              /* 復元失敗時はDBと在庫の手動確認が必要 */
+            }
+          }
+          throw innerErr
+        }
+
+        toast.success(
+          status === 'COMPLETED' || hadCompleted
+            ? '入出庫データを更新しました（在庫・個体追跡を同期しました）'
+            : '入出庫データを更新しました'
+        )
       } else {
         const { data: newTx, error } = await supabase
           .from('transactions')

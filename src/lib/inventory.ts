@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
-interface TxInfo {
+/** apply / revert に渡す取引ヘッダー（DBの transactions 行と対応） */
+export interface TxInfo {
   type: string
   date: string
   tracking_number: string | null
@@ -9,9 +10,28 @@ interface TxInfo {
   partner_name: string | null
 }
 
-interface ItemInfo {
+export interface ItemInfo {
   product_id: string
   quantity: number
+}
+
+/** DBの transactions 行から TxInfo を組み立てる */
+export function transactionRowToTxInfo(row: {
+  type: string
+  date: string
+  tracking_number: string | null
+  order_code: string | null
+  shipping_code: string | null
+  partner_name: string | null
+}): TxInfo {
+  return {
+    type: row.type,
+    date: row.date,
+    tracking_number: row.tracking_number,
+    order_code: row.order_code,
+    shipping_code: row.shipping_code,
+    partner_name: row.partner_name,
+  }
 }
 
 /**
@@ -128,6 +148,7 @@ export async function revertCompletedTransaction(
         out_transaction_id: null,
         out_date: null,
         shipping_code: null,
+        order_code: null,
       })
       .eq('out_transaction_id', txId)
   }

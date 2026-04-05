@@ -16,7 +16,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
-import { applyCompletedTransaction, revertCompletedTransaction } from '@/lib/inventory'
+import {
+  applyCompletedTransaction,
+  revertCompletedTransaction,
+  transactionRowToTxInfo,
+} from '@/lib/inventory'
 import { toast } from 'sonner'
 import type { Transaction, TransactionItem } from '@/types/database'
 
@@ -163,14 +167,29 @@ export function TransactionDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (!id) return
+    if (!id || !tx) return
+    let reverted = false
+    const itemLines = items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
     try {
+      if (tx.status === 'COMPLETED') {
+        await revertCompletedTransaction(id, transactionRowToTxInfo(tx), itemLines)
+        reverted = true
+      }
       const { error } = await supabase.from('transactions').delete().eq('id', id)
       if (error) throw error
       toast.success('削除しました')
       navigate('/transactions')
     } catch {
-      toast.error('削除に失敗しました')
+      if (reverted) {
+        try {
+          await applyCompletedTransaction(id, transactionRowToTxInfo(tx), itemLines)
+        } catch {
+          /* 復元も失敗した場合は手動確認が必要 */
+        }
+        toast.error('削除に失敗しました。在庫は取引完了状態に戻しました。')
+      } else {
+        toast.error('削除に失敗しました')
+      }
     }
   }
 
