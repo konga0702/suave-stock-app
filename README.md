@@ -82,6 +82,21 @@ npm run build
 
 `dist/` ディレクトリに本番用ファイルが生成されます。
 
+## デプロイ構成（Vercel と Supabase）
+
+- **Vercel**: このリポジトリの **フロントエンド（Vite ビルド成果物）** のホスティング用です。
+- **Supabase**: データベース（PostgreSQL）に加え、**外部在庫更新 API** は **Supabase Edge Function** として動作します。**この API は Vercel 上では実行されません。**
+
+## 外部在庫更新 API（n8n 連携）
+
+BASE / CiLEL などから入出庫を HTTP で取り込むエンドポイントは、リポジトリ内の Edge Function と DB の RPC で提供しています。
+
+- **詳細・curl・環境変数・Supabase への反映手順**: [docs/sync-inventory-api.md](./docs/sync-inventory-api.md)
+- **マイグレーション**: `supabase/migrations/009_sync_inventory_api.sql`
+- **Edge Function**: `supabase/functions/inventory-transactions/`
+
+GitHub に push した後も、**Supabase 側で `db push` / `secrets set` / `functions deploy` が別途必要**です（上記ドキュメントのチェリスト参照）。
+
 ## 主な機能
 
 | 機能 | 説明 |
@@ -111,6 +126,13 @@ GitHub Actions ワークフローが含まれています。
 ## プロジェクト構成
 
 ```
+docs/
+└── sync-inventory-api.md   # 外部在庫API（Edge Function / n8n）
+supabase/
+├── config.toml             # Supabase CLI（Edge Function の verify_jwt 等）
+├── functions/
+│   └── inventory-transactions/
+└── migrations/             # DB スキーマ（001〜）
 src/
 ├── components/
 │   ├── Layout.tsx           # ボトムナビ付きレイアウト

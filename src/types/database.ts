@@ -35,6 +35,9 @@ export interface Transaction {
   order_date: string | null
   purchase_order_code: string | null
   order_id: string | null
+  /** n8n 等の外部連携APIで設定（通常のUI取引は null） */
+  external_source: string | null
+  external_id: string | null
   total_amount: number
   memo: string | null
   created_at: string

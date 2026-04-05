@@ -1,0 +1,9 @@
+# Supabase CLI 用（ローカル検証・Edge Functions デプロイ）
+# プロジェクトと紐付ける: supabase link --project-ref <YOUR_PROJECT_REF>
+
+[api]
+enabled = true
+
+# カスタム Bearer（SYNC_API_TOKEN）で認証するため、JWT 検証は無効化
+[functions.inventory-transactions]
+verify_jwt = false

@@ -25,3 +25,6 @@ dist-ssr
 
 # Windows artifacts
 nul
+
+# 誤ってリポジトリルート直下に複製されたネストした別コピー（本体はこのリポジトリのルート）
+/suave-stock-app/
