@@ -444,7 +444,7 @@ Claude へ依頼する時は、少なくとも以下を渡すとよい。
 # 実行報告
 
 > 完了日時：2026-04-08 01:07
-> コミット：34518fd feat: 在庫不足時の予約注文対応（reservations + sync_inventory_transaction）
+> コミット：f0290b3 feat: 在庫不足時の予約注文対応（reservations + sync_inventory_transaction）
 
 ## 実施した内容
 - 在庫不足時に 400 で落とさず、`allow_backorder=true` の場合は予約化するための DB マイグレーションを追加。
