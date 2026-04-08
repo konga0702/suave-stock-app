@@ -7,7 +7,7 @@
 # 実行報告
 
 > 完了日時：2026-04-08 23:21
-> コミット：未実施（このターンではコミット未作成）
+> コミット：74bbabe feat: 出庫予定SCHEDULEDの同期処理を追加
 
 ## 実施した内容
 - `supabase/migrations/011_add_scheduled_status_support.sql` を新規追加し、`sync_inventory_transaction` を `CREATE OR REPLACE` で更新
