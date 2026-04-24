@@ -122,7 +122,7 @@ export function TrackStockPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       {product ? (
                         <Link
-                          to={`/inventory/${product.id}?tab=units`}
+                          to={`/inventory/${product.id}?tab=net`}
                           className="flex items-center gap-2 min-w-0 group"
                         >
                           <Package className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-emerald-600" />

@@ -26,7 +26,7 @@ export function InventoryDetailPage() {
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<string>(() => {
     const t = searchParams.get('tab')
-    return t === 'units' || t === 'out' ? t : 'in'
+    return t === 'net' || t === 'out' ? t : 'in'
   })
   const [product, setProduct] = useState<Product | null>(null)
   const [inEntries, setInEntries] = useState<TxEntry[]>([])
@@ -177,7 +177,7 @@ export function InventoryDetailPage() {
             netStock > 0 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' :
             netStock < 0 ? 'bg-rose-50/60 dark:bg-rose-950/30' : ''
           }`}
-          onClick={() => setActiveTab('units')}
+          onClick={() => setActiveTab('net')}
         >
           <CardContent className="p-3 text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
@@ -215,13 +215,13 @@ export function InventoryDetailPage() {
             出荷 ({outEntries.length})
           </TabsTrigger>
           <TabsTrigger
-            value="units"
+            value="net"
             className="flex-1 rounded-lg text-xs font-bold transition-all
               data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/30
               data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-emerald-500"
           >
             <Layers className="mr-1.5 h-3.5 w-3.5" />
-            個体 ({unitItems.length})
+            純在庫 ({unitItems.length})
           </TabsTrigger>
         </TabsList>
 
@@ -291,14 +291,14 @@ export function InventoryDetailPage() {
           )
         })}
 
-        {/* 在庫個体タブ */}
-        <TabsContent value="units" className="mt-3 space-y-2">
+        {/* 純在庫（残在庫内訳）タブ */}
+        <TabsContent value="net" className="mt-3 space-y-2">
           {unitItems.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
                 <Layers className="h-7 w-7 text-muted-foreground/40" />
               </div>
-              <p className="text-sm text-muted-foreground">未出庫の在庫個体はありません</p>
+              <p className="text-sm text-muted-foreground">純在庫（未出庫）の管理番号はありません</p>
             </div>
           ) : (
             unitItems.map((unit) => (

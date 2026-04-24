@@ -6,28 +6,30 @@
 
 # 実行報告
 
-> 完了日時：2026-04-08 23:21
-> コミット：74bbabe feat: 出庫予定SCHEDULEDの同期処理を追加
+> 完了日時：2026-04-24 14:05
+> コミット：未実施
 
 ## 実施した内容
-- `supabase/migrations/011_add_scheduled_status_support.sql` を新規追加し、`sync_inventory_transaction` を `CREATE OR REPLACE` で更新
-- `status` に `SCHEDULED` を許可し、`OUT` の `SCHEDULED` は transaction/transaction_items のみ作成して早期 return する分岐を追加
-- `status` 未指定時は従来どおり `COMPLETED` として扱い、既存の在庫引当・出庫完了処理は維持
-- `source` に加えて `external_source` でも受け取れるよう互換対応を追加（テストSQLとn8n payload想定に合わせる）
+- `InventoryDetailPage` のタブ構成を調整し、純在庫カードのクリックで「純在庫」タブを直接表示するように変更
+- 純在庫タブ内で、未出庫個体（= 入荷数 - 出荷数で残っている在庫）の管理番号一覧を確認できる導線を明確化
+- 他画面から在庫詳細へ遷移する `?tab=units` を `?tab=net` に統一して、純在庫内訳表示へ直リンクできるように修正
 
 ## 変更・作成したファイル
-- `supabase/migrations/011_add_scheduled_status_support.sql` → 新規作成。`sync_inventory_transaction` の `SCHEDULED` 対応と互換入力対応を実装
-- `prompt.md` → 実行報告を追記
+- `src/pages/InventoryDetailPage.tsx` → 純在庫クリック時の遷移先を `net` タブへ変更し、タブ名称・空状態文言を純在庫内訳向けに調整
+- `src/pages/InventoryPage.tsx` → 純在庫クリック時の遷移クエリを `?tab=net` に変更
+- `src/pages/NetStockPage.tsx` → 純在庫クリック時の遷移クエリを `?tab=net` に変更
+- `src/pages/TrackStockPage.tsx` → 商品リンク先クエリを `?tab=net` に変更
+- `prompt.md` → 実行報告を更新
 
 ## 動作確認ポイント
-- テストケース①（在庫あり・`SCHEDULED`）で `mode = "scheduled"` が返ること
-- `transactions.status = 'SCHEDULED'` で登録されること
-- 同ケースで `inventory_items.status` が `IN_STOCK` のまま変化しないこと
-- テストケース②（`status` 未指定）で従来の `COMPLETED` フローが維持されること
+- 在庫詳細画面で「純在庫」の数値カードをタップすると「純在庫」タブが開くこと
+- 純在庫タブで、残在庫の管理番号（`IS-...` など）が一覧表示されること
+- 在庫一覧・純在庫一覧から純在庫数をタップした際も、在庫詳細の純在庫タブへ遷移すること
+- タブ指定なしで在庫詳細を開いた場合は従来どおり「入荷」タブが初期表示されること
 
 ## 次回PMへの申し送り事項
-- 本対応は migration 追加のみで、Edge Function 側のコード変更は不要
-- SQL Editor で `011_add_scheduled_status_support.sql` を適用後、prompt内のSQLで回帰確認を実施してください
+- 純在庫内訳は `inventory_items.status = IN_STOCK` の個体一覧を表示しているため、管理番号は個体データの登録内容に依存する
+- 純在庫タブの名称変更に合わせて、将来的にヘルプ文言やマニュアル上の「個体」表現を「純在庫内訳」へ統一すると運用上わかりやすい
 
 ## 依頼内容
 

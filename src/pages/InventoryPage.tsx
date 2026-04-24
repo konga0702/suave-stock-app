@@ -385,7 +385,7 @@ export function InventoryPage() {
                       }`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(`/inventory/${row.product_id}?tab=units`)
+                        navigate(`/inventory/${row.product_id}?tab=net`)
                       }}
                       title="在庫個体を表示"
                     >
