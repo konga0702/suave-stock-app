@@ -191,20 +191,6 @@ export function InventoryDetailPage() {
 
   const getCodeLinks = (code: string): CodeTransactionLinks => codeTxMap.get(code) ?? { inTxId: null, outTxId: null }
 
-  const buildAdjustmentOutLink = (row: ManagementCodeRow): string => {
-    const params = new URLSearchParams({
-      type: 'OUT',
-      status: 'COMPLETED',
-      category: '廃棄',
-      product_id: productId ?? '',
-      quantity: String(Math.max(1, Math.abs(row.delta))),
-    })
-    if (row.code !== '（管理番号未設定）') {
-      params.set('tracking_number', row.code)
-    }
-    return `/transactions/new?${params.toString()}`
-  }
-
   const handleSyncShippedByCode = async (row: ManagementCodeRow) => {
     if (!productId) return
     if (row.delta <= 0) return
@@ -570,15 +556,6 @@ export function InventoryDetailPage() {
                             >
                               {syncingCode === row.code ? '同期中...' : '出庫済みに同期'}
                             </Button>
-                          )}
-                          {row.delta < 0 && (
-                            <Link
-                              to={buildAdjustmentOutLink(row)}
-                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              調整出庫を作成
-                              <ChevronRight className="h-3 w-3" />
-                            </Link>
                           )}
                         </div>
                       </div>
