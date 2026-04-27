@@ -28,6 +28,11 @@ interface ManagementCodeRow {
   delta: number
 }
 
+interface CodeTransactionLinks {
+  inTxId: string | null
+  outTxId: string | null
+}
+
 export function InventoryDetailPage() {
   const navigate = useNavigate()
   const { productId } = useParams<{ productId: string }>()
@@ -153,6 +158,34 @@ export function InventoryDetailPage() {
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.code.localeCompare(b.code))
 
   const hasMismatch = mismatchRows.length > 0
+
+  const codeTxMap = new Map<string, CodeTransactionLinks>()
+  const ensureCodeTx = (code: string): CodeTransactionLinks => {
+    const existing = codeTxMap.get(code)
+    if (existing) return existing
+    const created: CodeTransactionLinks = { inTxId: null, outTxId: null }
+    codeTxMap.set(code, created)
+    return created
+  }
+
+  for (const entry of inEntries) {
+    const code = getEntryManagementCode(entry)
+    const links = ensureCodeTx(code)
+    if (!links.inTxId && entry.txId) links.inTxId = entry.txId
+  }
+  for (const entry of outEntries) {
+    const code = getEntryManagementCode(entry)
+    const links = ensureCodeTx(code)
+    if (!links.outTxId && entry.txId) links.outTxId = entry.txId
+  }
+  for (const unit of unitItems) {
+    const code = getUnitManagementCode(unit)
+    const links = ensureCodeTx(code)
+    if (!links.inTxId && unit.in_transaction_id) links.inTxId = unit.in_transaction_id
+    if (!links.outTxId && unit.out_transaction_id) links.outTxId = unit.out_transaction_id
+  }
+
+  const getCodeLinks = (code: string): CodeTransactionLinks => codeTxMap.get(code) ?? { inTxId: null, outTxId: null }
 
   if (loading) {
     return (
@@ -386,13 +419,40 @@ export function InventoryDetailPage() {
                   className="border border-emerald-200/70 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm rounded-2xl"
                 >
                   <CardContent className="p-4">
+                    {(() => {
+                      const links = getCodeLinks(code)
+                      return (
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{code}</p>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{code}</p>
+                        <div className="flex items-center gap-2">
+                          {links.inTxId && (
+                            <Link
+                              to={`/transactions/${links.inTxId}`}
+                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              入庫取引
+                              <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          )}
+                          {links.outTxId && (
+                            <Link
+                              to={`/transactions/${links.outTxId}`}
+                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              出庫取引
+                              <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                       <div className="rounded-xl px-3 py-2 text-center min-w-[58px] bg-emerald-100/70 dark:bg-emerald-900/50">
                         <p className="text-[9px] font-medium text-muted-foreground/60 mb-0.5">帳簿</p>
                         <p className="text-base font-bold num-display text-emerald-600 dark:text-emerald-400">{qty}</p>
                       </div>
                     </div>
+                      )
+                    })()}
                   </CardContent>
                 </Card>
               ))
@@ -408,8 +468,33 @@ export function InventoryDetailPage() {
                   className="border border-rose-200/80 dark:border-rose-800/50 bg-rose-50/50 dark:bg-rose-950/20 shadow-sm rounded-2xl"
                 >
                   <CardContent className="p-4">
+                    {(() => {
+                      const links = getCodeLinks(row.code)
+                      return (
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{row.code}</p>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{row.code}</p>
+                        <div className="flex items-center gap-2">
+                          {links.inTxId && (
+                            <Link
+                              to={`/transactions/${links.inTxId}`}
+                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              入庫取引
+                              <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          )}
+                          {links.outTxId && (
+                            <Link
+                              to={`/transactions/${links.outTxId}`}
+                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              出庫取引
+                              <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                       <div className="text-right text-xs">
                         <p className="text-muted-foreground">帳簿 {row.expectedQty} / 実在庫 {row.actualQty}</p>
                         <p className={`font-bold num-display ${row.delta > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
@@ -417,6 +502,8 @@ export function InventoryDetailPage() {
                         </p>
                       </div>
                     </div>
+                      )
+                    })()}
                   </CardContent>
                 </Card>
               ))}
