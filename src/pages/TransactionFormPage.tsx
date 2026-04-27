@@ -215,39 +215,43 @@ export function TransactionFormPage() {
       toast.error('日付を入力してください')
       return
     }
+    let skipInventoryApplyForOut = false
+    const selectedInventoryIdsByProduct: Record<string, string[]> = {}
     if (type === 'OUT') {
       const selectedCode = normalizeManagementCode(
         trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
       )
       if (!selectedCode) {
-        toast.error('出庫時は管理番号を入力してください')
-        return
-      }
+        toast.warning('管理番号が未入力のため、帳簿のみ保存します')
+        skipInventoryApplyForOut = true
+      } else {
+        const productIds = [...new Set(items.map((item) => item.product_id))]
+        const { data: stockRows, error: stockErr } = await supabase
+          .from('inventory_items')
+          .select('id, product_id, tracking_number, order_code, shipping_code')
+          .in('product_id', productIds)
+          .eq('status', 'IN_STOCK')
 
-      const productIds = [...new Set(items.map((item) => item.product_id))]
-      const { data: stockRows, error: stockErr } = await supabase
-        .from('inventory_items')
-        .select('id, product_id, tracking_number, order_code, shipping_code')
-        .in('product_id', productIds)
-        .eq('status', 'IN_STOCK')
-
-      if (stockErr) {
-        toast.error('在庫確認に失敗しました。時間をおいて再試行してください')
-        return
-      }
-
-      for (const item of items) {
-        const matchedCount = (stockRows ?? []).filter(
-          (row) => row.product_id === item.product_id && matchesManagementCode(row, selectedCode)
-        ).length
-
-        if (matchedCount === 0) {
-          toast.error(`管理番号「${selectedCode}」は在庫に存在しません`)
+        if (stockErr) {
+          toast.error('在庫確認に失敗しました。時間をおいて再試行してください')
           return
         }
-        if (status === 'COMPLETED' && matchedCount < item.quantity) {
-          toast.error(`管理番号「${selectedCode}」の在庫数が不足しています（必要 ${item.quantity} / 在庫 ${matchedCount}）`)
-          return
+
+        for (const item of items) {
+          const matchedRows = (stockRows ?? []).filter(
+            (row) => row.product_id === item.product_id && matchesManagementCode(row, selectedCode)
+          )
+          selectedInventoryIdsByProduct[item.product_id] = matchedRows.map((row) => row.id)
+
+          if (matchedRows.length === 0) {
+            toast.warning(`管理番号「${selectedCode}」は在庫に存在しないため、帳簿のみ保存します`)
+            skipInventoryApplyForOut = true
+            continue
+          }
+          if (status === 'COMPLETED' && matchedRows.length < item.quantity) {
+            toast.warning(`管理番号「${selectedCode}」の在庫数が不足しているため、帳簿のみ保存します`)
+            skipInventoryApplyForOut = true
+          }
         }
       }
     }
@@ -329,7 +333,7 @@ export function TransactionFormPage() {
             )
           if (itemsError) throw itemsError
 
-          if (status === 'COMPLETED') {
+          if (status === 'COMPLETED' && !(type === 'OUT' && skipInventoryApplyForOut)) {
             await applyCompletedTransaction(
               id!,
               {
@@ -340,7 +344,8 @@ export function TransactionFormPage() {
                 shipping_code: shippingCode.trim() || null,
                 partner_name: partnerName.trim() || null,
               },
-              items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+              items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+              selectedInventoryIdsByProduct
             )
           }
         } catch (innerErr) {
@@ -358,11 +363,15 @@ export function TransactionFormPage() {
           throw innerErr
         }
 
-        toast.success(
-          status === 'COMPLETED' || hadCompleted
-            ? '入出庫データを更新しました（在庫・個体追跡を同期しました）'
-            : '入出庫データを更新しました'
-        )
+        if (type === 'OUT' && skipInventoryApplyForOut && status === 'COMPLETED') {
+          toast.success('出庫データを帳簿のみ更新しました（在庫個体は未同期）')
+        } else {
+          toast.success(
+            status === 'COMPLETED' || hadCompleted
+              ? '入出庫データを更新しました（在庫・個体追跡を同期しました）'
+              : '入出庫データを更新しました'
+          )
+        }
       } else {
         const { data: newTx, error } = await supabase
           .from('transactions')
@@ -384,7 +393,7 @@ export function TransactionFormPage() {
         if (itemsError) throw itemsError
 
         // 直接 COMPLETED で保存した場合も在庫・個体追跡に反映
-        if (status === 'COMPLETED') {
+        if (status === 'COMPLETED' && !(type === 'OUT' && skipInventoryApplyForOut)) {
           await applyCompletedTransaction(
             newTx.id,
             {
@@ -395,11 +404,16 @@ export function TransactionFormPage() {
               shipping_code: shippingCode.trim() || null,
               partner_name: partnerName.trim() || null,
             },
-            items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
+            items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+            selectedInventoryIdsByProduct
           )
         }
 
-        toast.success('入出庫データを登録しました')
+        if (type === 'OUT' && skipInventoryApplyForOut && status === 'COMPLETED') {
+          toast.success('出庫データを帳簿のみ登録しました（在庫個体は未同期）')
+        } else {
+          toast.success('入出庫データを登録しました')
+        }
       }
       navigate('/transactions')
     } catch (err: unknown) {

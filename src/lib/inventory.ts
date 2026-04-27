@@ -43,7 +43,8 @@ export function transactionRowToTxInfo(row: {
 export async function applyCompletedTransaction(
   txId: string,
   tx: TxInfo,
-  items: ItemInfo[]
+  items: ItemInfo[],
+  selectedInventoryIdsByProduct?: Record<string, string[]>
 ): Promise<void> {
   // 在庫数を更新
   for (const item of items) {
@@ -114,6 +115,12 @@ export async function applyCompletedTransaction(
 
       if (stockItems && stockItems.length > 0) {
         let targetIds: string[] = []
+        const explicitIds = (selectedInventoryIdsByProduct?.[item.product_id] ?? [])
+          .filter((id) => stockItems.some((row) => row.id === id))
+
+        if (explicitIds.length >= item.quantity) {
+          targetIds = explicitIds.slice(0, item.quantity)
+        } else {
         const codeCandidates = [
           ...pickMatches(stockItems, tx.tracking_number),
           ...pickMatches(stockItems, tx.order_code),
@@ -133,6 +140,7 @@ export async function applyCompletedTransaction(
           targetIds = uniqueByCode.slice(0, item.quantity).map((si) => si.id)
         } else {
           targetIds = stockItems.slice(0, item.quantity).map((si) => si.id)
+        }
         }
 
         await supabase

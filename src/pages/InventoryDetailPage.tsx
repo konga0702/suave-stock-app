@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Package, ArrowDownToLine, ArrowUpFromLine, ChevronRight, Layers,
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 import type { Product, InventoryItem } from '@/types/database'
 
 interface TxEntry {
@@ -17,7 +18,20 @@ interface TxEntry {
   partner_name: string | null
   tracking_number: string | null
   order_code: string | null
+  shipping_code: string | null
   category: string | null
+}
+
+interface ManagementCodeRow {
+  code: string
+  expectedQty: number
+  actualQty: number
+  delta: number
+}
+
+interface CodeTransactionLinks {
+  inTxId: string | null
+  outTxId: string | null
 }
 
 export function InventoryDetailPage() {
@@ -33,69 +47,285 @@ export function InventoryDetailPage() {
   const [outEntries, setOutEntries] = useState<TxEntry[]>([])
   const [unitItems, setUnitItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncingCode, setSyncingCode] = useState<string | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
+
+  const normalizeCode = (value: string | null | undefined): string =>
+    (value ?? '').trim().replace(/[‐‑‒–—―ー−]/g, '-').toUpperCase()
+
+  const getEntryManagementCode = (entry: TxEntry): string =>
+    normalizeCode(entry.tracking_number)
+    || normalizeCode(entry.order_code)
+    || normalizeCode(entry.shipping_code)
+    || '（管理番号未設定）'
+
+  const getUnitManagementCode = (unit: InventoryItem): string =>
+    normalizeCode(unit.tracking_number)
+    || normalizeCode(unit.order_code)
+    || normalizeCode(unit.shipping_code)
+    || '（管理番号未設定）'
+
+  const loadDetail = useCallback(async () => {
+    if (!productId) return
+
+    const { data: prod } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single()
+    if (prod) setProduct(prod)
+
+    const [{ data: inData }, { data: outData }, { data: unitData }] = await Promise.all([
+      supabase
+        .from('transaction_items')
+        .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
+        .eq('product_id', productId)
+        .eq('transaction.type' as string, 'IN')
+        .eq('transaction.status' as string, 'COMPLETED'),
+      supabase
+        .from('transaction_items')
+        .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
+        .eq('product_id', productId)
+        .eq('transaction.type' as string, 'OUT')
+        .eq('transaction.status' as string, 'COMPLETED'),
+      supabase
+        .from('inventory_items')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('status', 'IN_STOCK')
+        .order('in_date', { ascending: false }),
+    ])
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mapEntry = (item: any): TxEntry => {
+      const tx = Array.isArray(item.transaction) ? item.transaction[0] : item.transaction
+      return {
+        txId:            tx?.id ?? '',
+        date:            tx?.date ?? '',
+        quantity:        item.quantity ?? 0,
+        price:           Number(item.price ?? 0),
+        partner_name:    tx?.partner_name ?? null,
+        tracking_number: tx?.tracking_number ?? null,
+        order_code:      tx?.order_code ?? null,
+        shipping_code:   tx?.shipping_code ?? null,
+        category:        tx?.category ?? null,
+      }
+    }
+
+    const sorted = (arr: TxEntry[]) => [...arr].sort((a, b) => b.date.localeCompare(a.date))
+
+    setInEntries(sorted((inData ?? []).map(mapEntry)))
+    setOutEntries(sorted((outData ?? []).map(mapEntry)))
+    setUnitItems((unitData ?? []) as InventoryItem[])
+    setLoading(false)
+  }, [productId])
 
   useEffect(() => {
-    if (!productId) return
-    async function load() {
-      // 商品情報
-      const { data: prod } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single()
-      if (prod) setProduct(prod)
-
-      // 入荷・出荷履歴・在庫個体を並列取得
-      const [{ data: inData }, { data: outData }, { data: unitData }] = await Promise.all([
-        supabase
-          .from('transaction_items')
-          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, category)')
-          .eq('product_id', productId)
-          .eq('transaction.type' as string, 'IN')
-          .eq('transaction.status' as string, 'COMPLETED'),
-        supabase
-          .from('transaction_items')
-          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, category)')
-          .eq('product_id', productId)
-          .eq('transaction.type' as string, 'OUT')
-          .eq('transaction.status' as string, 'COMPLETED'),
-        supabase
-          .from('inventory_items')
-          .select('*')
-          .eq('product_id', productId)
-          .eq('status', 'IN_STOCK')
-          .order('in_date', { ascending: false }),
-      ])
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapEntry = (item: any): TxEntry => {
-        const tx = Array.isArray(item.transaction) ? item.transaction[0] : item.transaction
-        return {
-          txId:            tx?.id ?? '',
-          date:            tx?.date ?? '',
-          quantity:        item.quantity ?? 0,
-          price:           Number(item.price ?? 0),
-          partner_name:    tx?.partner_name ?? null,
-          tracking_number: tx?.tracking_number ?? null,
-          order_code:      tx?.order_code ?? null,
-          category:        tx?.category ?? null,
-        }
-      }
-
-      const sorted = (arr: TxEntry[]) =>
-        [...arr].sort((a, b) => b.date.localeCompare(a.date))
-
-      setInEntries(sorted((inData ?? []).map(mapEntry)))
-      setOutEntries(sorted((outData ?? []).map(mapEntry)))
-      setUnitItems((unitData ?? []) as InventoryItem[])
-      setLoading(false)
-    }
-    load()
-  }, [productId])
+    loadDetail()
+  }, [loadDetail])
 
   const totalIn  = inEntries.reduce((s, e) => s + e.quantity, 0)
   const totalOut = outEntries.reduce((s, e) => s + e.quantity, 0)
-  const netStock = totalIn - totalOut
+  const ledgerNetStock = totalIn - totalOut
+
+  const expectedMap = new Map<string, number>()
+  for (const entry of inEntries) {
+    const code = getEntryManagementCode(entry)
+    expectedMap.set(code, (expectedMap.get(code) ?? 0) + entry.quantity)
+  }
+  for (const entry of outEntries) {
+    const code = getEntryManagementCode(entry)
+    expectedMap.set(code, (expectedMap.get(code) ?? 0) - entry.quantity)
+  }
+
+  const actualMap = new Map<string, number>()
+  for (const unit of unitItems) {
+    const code = getUnitManagementCode(unit)
+    actualMap.set(code, (actualMap.get(code) ?? 0) + 1)
+  }
+
+  const mismatchRows: ManagementCodeRow[] = [...new Set([...expectedMap.keys(), ...actualMap.keys()])]
+    .map((code) => ({
+      code,
+      expectedQty: expectedMap.get(code) ?? 0,
+      actualQty: actualMap.get(code) ?? 0,
+      delta: (actualMap.get(code) ?? 0) - (expectedMap.get(code) ?? 0),
+    }))
+    .filter((row) => row.delta !== 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.code.localeCompare(b.code))
+
+  const hasMismatch = mismatchRows.length > 0
+
+  const codeTxMap = new Map<string, CodeTransactionLinks>()
+  const ensureCodeTx = (code: string): CodeTransactionLinks => {
+    const existing = codeTxMap.get(code)
+    if (existing) return existing
+    const created: CodeTransactionLinks = { inTxId: null, outTxId: null }
+    codeTxMap.set(code, created)
+    return created
+  }
+  for (const entry of inEntries) {
+    const links = ensureCodeTx(getEntryManagementCode(entry))
+    if (!links.inTxId && entry.txId) links.inTxId = entry.txId
+  }
+  for (const entry of outEntries) {
+    const links = ensureCodeTx(getEntryManagementCode(entry))
+    if (!links.outTxId && entry.txId) links.outTxId = entry.txId
+  }
+  for (const unit of unitItems) {
+    const links = ensureCodeTx(getUnitManagementCode(unit))
+    if (!links.inTxId && unit.in_transaction_id) links.inTxId = unit.in_transaction_id
+    if (!links.outTxId && unit.out_transaction_id) links.outTxId = unit.out_transaction_id
+  }
+  const getCodeLinks = (code: string): CodeTransactionLinks => codeTxMap.get(code) ?? { inTxId: null, outTxId: null }
+
+  const createLedgerAdjustment = async (
+    row: ManagementCodeRow,
+    type: 'IN' | 'OUT',
+    quantity: number,
+    category: '棚卸' | '廃棄'
+  ) => {
+    if (!productId) return
+    const payload = {
+      type,
+      status: 'COMPLETED',
+      category,
+      date: new Date().toISOString().slice(0, 10),
+      tracking_number: row.code === '（管理番号未設定）' ? null : row.code,
+      order_code: null,
+      shipping_code: null,
+      partner_name: '在庫調整',
+      customer_name: null,
+      order_date: null,
+      purchase_order_code: null,
+      order_id: null,
+      total_amount: 0,
+      memo: `不整合調整: ${row.code}`,
+    }
+
+    const { data: tx, error: txErr } = await supabase
+      .from('transactions')
+      .insert(payload)
+      .select('id')
+      .single()
+    if (txErr || !tx) throw txErr ?? new Error('調整取引の作成に失敗しました')
+
+    const { error: itemErr } = await supabase
+      .from('transaction_items')
+      .insert({
+        transaction_id: tx.id,
+        product_id: productId,
+        quantity,
+        price: 0,
+      })
+    if (itemErr) throw itemErr
+  }
+
+  const handleSyncShippedByCode = async (row: ManagementCodeRow) => {
+    if (!productId || row.delta <= 0) return
+    const links = getCodeLinks(row.code)
+    if (!links.outTxId) {
+      toast.error('対応する出庫取引が見つからないため同期できません')
+      return
+    }
+
+    setSyncingCode(row.code)
+    try {
+      const targets = unitItems
+        .filter((u) => getUnitManagementCode(u) === row.code)
+        .slice(0, row.delta)
+      if (targets.length === 0) {
+        toast.error('同期対象の実在庫が見つかりませんでした')
+        return
+      }
+
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          status: 'SHIPPED',
+          out_transaction_id: links.outTxId,
+          out_date: new Date().toISOString().slice(0, 10),
+        })
+        .in('id', targets.map((t) => t.id))
+      if (error) throw error
+
+      toast.success(`${targets.length}件を出庫済みに同期しました`)
+      await loadDetail()
+    } catch (error) {
+      console.error('[InventoryDetail] 同期エラー:', error)
+      toast.error('出庫済み同期に失敗しました')
+    } finally {
+      setSyncingCode(null)
+    }
+  }
+
+  const handleResolveRow = async (row: ManagementCodeRow, mode: 'noStock' | 'hasStock') => {
+    if (!productId) return
+    setAdjusting(true)
+    try {
+      if (row.delta > 0) {
+        if (mode === 'noStock') {
+          await handleSyncShippedByCode(row)
+          return
+        }
+        await createLedgerAdjustment(row, 'IN', row.delta, '棚卸')
+      } else {
+        const qty = Math.abs(row.delta)
+        if (mode === 'noStock') {
+          await createLedgerAdjustment(row, 'OUT', qty, '廃棄')
+        } else {
+          const links = getCodeLinks(row.code)
+          const today = new Date().toISOString().slice(0, 10)
+          const addRows = Array.from({ length: qty }).map((_, idx) => ({
+            product_id: productId,
+            tracking_number: row.code === '（管理番号未設定）' ? `ADJ-${today}-${idx + 1}` : row.code,
+            order_code: null as string | null,
+            shipping_code: null as string | null,
+            status: 'IN_STOCK' as const,
+            in_transaction_id: links.inTxId,
+            out_transaction_id: null as string | null,
+            in_date: today,
+            out_date: null as string | null,
+            partner_name: '在庫調整' as string | null,
+          }))
+          const { error } = await supabase.from('inventory_items').insert(addRows)
+          if (error) throw error
+        }
+      }
+
+      toast.success('不整合調整を反映しました')
+      await loadDetail()
+    } catch (error) {
+      console.error('[InventoryDetail] 調整エラー:', error)
+      toast.error('不整合調整に失敗しました')
+    } finally {
+      setAdjusting(false)
+    }
+  }
+
+  const handleMonthlyAutoReconcile = async () => {
+    if (!productId || mismatchRows.length === 0) return
+    const ok = window.confirm(`不整合 ${mismatchRows.length} 件を帳簿調整で一括反映します。よろしいですか？`)
+    if (!ok) return
+
+    setAdjusting(true)
+    try {
+      for (const row of mismatchRows) {
+        if (row.delta > 0) {
+          await createLedgerAdjustment(row, 'IN', row.delta, '棚卸')
+        } else {
+          await createLedgerAdjustment(row, 'OUT', Math.abs(row.delta), '棚卸')
+        }
+      }
+      toast.success('月次一括棚卸を作成しました')
+      await loadDetail()
+    } catch (error) {
+      console.error('[InventoryDetail] 一括棚卸エラー:', error)
+      toast.error('月次一括棚卸に失敗しました')
+    } finally {
+      setAdjusting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -174,8 +404,8 @@ export function InventoryDetailPage() {
         </Card>
         <Card
           className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none cursor-pointer transition-all hover:ring-2 hover:ring-emerald-300 ${
-            netStock > 0 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' :
-            netStock < 0 ? 'bg-rose-50/60 dark:bg-rose-950/30' : ''
+            ledgerNetStock > 0 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' :
+            ledgerNetStock < 0 ? 'bg-rose-50/60 dark:bg-rose-950/30' : ''
           }`}
           onClick={() => setActiveTab('net')}
         >
@@ -185,10 +415,10 @@ export function InventoryDetailPage() {
               <p className="text-[10px] font-medium text-muted-foreground">純在庫</p>
             </div>
             <p className={`text-xl font-bold num-display ${
-              netStock > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-              netStock < 0 ? 'text-rose-600 dark:text-rose-400' :
+              ledgerNetStock > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+              ledgerNetStock < 0 ? 'text-rose-600 dark:text-rose-400' :
               'text-slate-500'
-            }`}>{netStock}</p>
+            }`}>{ledgerNetStock}</p>
           </CardContent>
         </Card>
       </div>
@@ -221,7 +451,7 @@ export function InventoryDetailPage() {
               data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-emerald-500"
           >
             <Layers className="mr-1.5 h-3.5 w-3.5" />
-            純在庫 ({unitItems.length})
+            純在庫 ({ledgerNetStock})
           </TabsTrigger>
         </TabsList>
 
@@ -293,6 +523,112 @@ export function InventoryDetailPage() {
 
         {/* 純在庫（残在庫内訳）タブ */}
         <TabsContent value="net" className="mt-3 space-y-2">
+          <Card className="border border-border/50 shadow-sm rounded-2xl">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">帳簿純在庫</p>
+                  <p className="text-base font-bold num-display text-emerald-600 dark:text-emerald-400">{ledgerNetStock}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">実在庫</p>
+                  <p className="text-base font-bold num-display text-sky-600 dark:text-sky-400">{unitItems.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">不整合件数</p>
+                  <p className={`text-base font-bold num-display ${hasMismatch ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {mismatchRows.length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs font-semibold text-muted-foreground">不整合（帳簿と実在庫の差分）</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 rounded-lg px-2.5 text-[11px]"
+              onClick={handleMonthlyAutoReconcile}
+              disabled={adjusting || mismatchRows.length === 0}
+            >
+              {adjusting ? '実行中...' : '月次一括棚卸'}
+            </Button>
+          </div>
+
+          {hasMismatch ? (
+            mismatchRows.map((row) => {
+              const links = getCodeLinks(row.code)
+              return (
+                <Card
+                  key={`mismatch-${row.code}`}
+                  className="border border-rose-200/80 dark:border-rose-800/50 bg-rose-50/50 dark:bg-rose-950/20 shadow-sm rounded-2xl"
+                >
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{row.code}</p>
+                      <div className="text-right text-xs">
+                        <p className="text-muted-foreground">帳簿 {row.expectedQty} / 実在庫 {row.actualQty}</p>
+                        <p className={`font-bold num-display ${row.delta > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {row.delta > 0 ? `実在庫 +${row.delta}` : `実在庫 ${row.delta}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {links.inTxId && (
+                        <Link
+                          to={`/transactions/${links.inTxId}`}
+                          className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          入庫取引
+                          <ChevronRight className="h-3 w-3" />
+                        </Link>
+                      )}
+                      {links.outTxId && (
+                        <Link
+                          to={`/transactions/${links.outTxId}`}
+                          className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          出庫取引
+                          <ChevronRight className="h-3 w-3" />
+                        </Link>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 rounded-lg px-2.5 text-[11px]"
+                        onClick={() => handleResolveRow(row, 'noStock')}
+                        disabled={adjusting || syncingCode === row.code}
+                      >
+                        実物なしで補正
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 rounded-lg px-2.5 text-[11px]"
+                        onClick={() => handleResolveRow(row, 'hasStock')}
+                        disabled={adjusting || syncingCode === row.code}
+                      >
+                        実物ありで補正
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })
+          ) : (
+            <Card className="border border-dashed rounded-2xl">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">不整合はありません</p>
+              </CardContent>
+            </Card>
+          )}
+
+          <p className="px-1 text-xs font-semibold text-muted-foreground">実在庫の管理番号（個体テーブル）</p>
           {unitItems.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
