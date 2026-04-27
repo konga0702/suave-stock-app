@@ -47,7 +47,6 @@ export function TransactionFormPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isEdit = !!id
-  const adjustMode = searchParams.get('adjust_mode')
 
   const [type, setType] = useState<TransactionType>(
     (searchParams.get('type') as TransactionType) || 'IN'
@@ -396,7 +395,7 @@ export function TransactionFormPage() {
             )
           if (itemsError) throw itemsError
 
-          if (status === 'COMPLETED' && adjustMode !== 'ledger_only') {
+          if (status === 'COMPLETED') {
             await applyCompletedTransaction(
               id!,
               {
@@ -426,7 +425,7 @@ export function TransactionFormPage() {
         }
 
         toast.success(
-          (status === 'COMPLETED' || hadCompleted) && adjustMode !== 'ledger_only'
+          status === 'COMPLETED' || hadCompleted
             ? '入出庫データを更新しました（在庫・個体追跡を同期しました）'
             : '入出庫データを更新しました'
         )
@@ -451,7 +450,7 @@ export function TransactionFormPage() {
         if (itemsError) throw itemsError
 
         // 直接 COMPLETED で保存した場合も在庫・個体追跡に反映
-        if (status === 'COMPLETED' && adjustMode !== 'ledger_only') {
+        if (status === 'COMPLETED') {
           await applyCompletedTransaction(
             newTx.id,
             {
