@@ -82,57 +82,17 @@ export async function applyCompletedTransaction(
       await supabase.from('inventory_items').insert(inserts)
     }
   } else {
-    // 出庫: 指定管理番号があれば優先しつつIN_STOCK個体をSHIPPEDに更新
+    // 出庫: IN_STOCK個体をSHIPPEDに更新 (FIFO)
     for (const item of items) {
       const { data: stockItems } = await supabase
         .from('inventory_items')
-        .select('id, tracking_number, order_code, shipping_code')
+        .select('id')
         .eq('product_id', item.product_id)
         .eq('status', 'IN_STOCK')
         .order('in_date', { ascending: true })
-        .limit(Math.max(item.quantity * 3, item.quantity + 10))
-
-      const pickByCode = (
-        rows: Array<{ id: string; tracking_number: string | null; order_code: string | null; shipping_code: string | null }>,
-        code: string | null
-      ) => {
-        if (!code) return [] as typeof rows
-        return rows.filter(
-          (row) =>
-            row.tracking_number === code
-            || row.order_code === code
-            || row.shipping_code === code
-        )
-      }
+        .limit(item.quantity)
 
       if (stockItems && stockItems.length > 0) {
-        const picked: Array<{ id: string; tracking_number: string | null; order_code: string | null; shipping_code: string | null }> = []
-        const used = new Set<string>()
-
-        for (const row of pickByCode(stockItems, tx.tracking_number)) {
-          if (picked.length >= item.quantity) break
-          picked.push(row)
-          used.add(row.id)
-        }
-        for (const row of pickByCode(stockItems, tx.order_code)) {
-          if (picked.length >= item.quantity) break
-          if (used.has(row.id)) continue
-          picked.push(row)
-          used.add(row.id)
-        }
-        for (const row of pickByCode(stockItems, tx.shipping_code)) {
-          if (picked.length >= item.quantity) break
-          if (used.has(row.id)) continue
-          picked.push(row)
-          used.add(row.id)
-        }
-        for (const row of stockItems) {
-          if (picked.length >= item.quantity) break
-          if (used.has(row.id)) continue
-          picked.push(row)
-          used.add(row.id)
-        }
-
         await supabase
           .from('inventory_items')
           .update({
@@ -142,7 +102,7 @@ export async function applyCompletedTransaction(
             shipping_code: tx.shipping_code || null,
             order_code: tx.order_code || null,
           })
-          .in('id', picked.map((si) => si.id))
+          .in('id', stockItems.map((si) => si.id))
       }
     }
   }

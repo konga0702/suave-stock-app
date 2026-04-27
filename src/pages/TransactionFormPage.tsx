@@ -34,11 +34,6 @@ interface ItemRow {
   price: number
 }
 
-interface OutCodeCandidate {
-  code: string
-  count: number
-}
-
 const IN_CATEGORIES: TransactionCategory[] = ['入荷', '返品', '棚卸']
 const OUT_CATEGORIES: TransactionCategory[] = ['出荷', '再送', '棚卸', '廃棄']
 
@@ -80,8 +75,6 @@ export function TransactionFormPage() {
   const [productSearch, setProductSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
-  const [outCodeCandidates, setOutCodeCandidates] = useState<OutCodeCandidate[]>([])
-  const [loadingOutCodes, setLoadingOutCodes] = useState(false)
 
   useEffect(() => {
     supabase
@@ -199,61 +192,6 @@ export function TransactionFormPage() {
     setItems(items.filter((_, i) => i !== index))
   }
 
-  const getInventoryManagementCode = (row: {
-    tracking_number: string | null
-    order_code: string | null
-    shipping_code: string | null
-  }): string =>
-    row.tracking_number?.trim()
-    || row.order_code?.trim()
-    || row.shipping_code?.trim()
-    || '（管理番号未設定）'
-
-  useEffect(() => {
-    if (type !== 'OUT' || items.length === 0) {
-      setOutCodeCandidates([])
-      return
-    }
-
-    const productIds = [...new Set(items.map((item) => item.product_id))]
-    let active = true
-
-    async function loadOutCandidates() {
-      setLoadingOutCodes(true)
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('product_id, tracking_number, order_code, shipping_code')
-        .in('product_id', productIds)
-        .eq('status', 'IN_STOCK')
-        .order('in_date', { ascending: true })
-
-      if (!active) return
-      if (error) {
-        setOutCodeCandidates([])
-        setLoadingOutCodes(false)
-        return
-      }
-
-      const countMap = new Map<string, number>()
-      for (const row of data ?? []) {
-        const code = getInventoryManagementCode(row)
-        countMap.set(code, (countMap.get(code) ?? 0) + 1)
-      }
-
-      const candidates = [...countMap.entries()]
-        .map(([code, count]) => ({ code, count }))
-        .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
-
-      setOutCodeCandidates(candidates)
-      setLoadingOutCodes(false)
-    }
-
-    loadOutCandidates()
-    return () => {
-      active = false
-    }
-  }, [type, items])
-
   const handleSave = async () => {
     if (items.length === 0) {
       toast.error('明細を追加してください')
@@ -262,18 +200,6 @@ export function TransactionFormPage() {
     if (!date) {
       toast.error('日付を入力してください')
       return
-    }
-    if (type === 'OUT') {
-      const selectedCode = trackingNumber.trim()
-      if (!selectedCode) {
-        toast.error('出庫時は管理番号を在庫候補から選択してください')
-        return
-      }
-      const exists = outCodeCandidates.some((candidate) => candidate.code === selectedCode)
-      if (!exists) {
-        toast.error('管理番号は入庫済み在庫の候補から選択してください')
-        return
-      }
     }
     setSaving(true)
     try {
@@ -585,7 +511,7 @@ export function TransactionFormPage() {
                 <Input
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder={type === 'OUT' ? '下の在庫候補から選択' : '手入力 or スキャン'}
+                  placeholder="手入力 or スキャン"
                   inputMode="text"
                   enterKeyHint="done"
                   className="flex-1 rounded-xl bg-white dark:bg-white/5 border-border/60"
@@ -607,40 +533,6 @@ export function TransactionFormPage() {
                   <ClipboardPaste className="h-4 w-4" />
                 </Button>
               </div>
-              {type === 'OUT' && (
-                <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-2.5 dark:border-amber-900/60 dark:bg-amber-950/20">
-                  <p className="mb-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                    出庫は入庫済み管理番号から選択してください
-                  </p>
-                  {loadingOutCodes ? (
-                    <p className="text-[11px] text-muted-foreground">候補を読み込み中...</p>
-                  ) : outCodeCandidates.length === 0 ? (
-                    <p className="text-[11px] text-rose-600 dark:text-rose-400">
-                      選択可能な在庫候補がありません
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {outCodeCandidates.map((candidate) => {
-                        const active = trackingNumber.trim() === candidate.code
-                        return (
-                          <button
-                            key={candidate.code}
-                            type="button"
-                            onClick={() => setTrackingNumber(candidate.code)}
-                            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                              active
-                                ? 'border-amber-500 bg-amber-500 text-white'
-                                : 'border-amber-300/70 bg-white text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/50'
-                            }`}
-                          >
-                            {candidate.code} ({candidate.count})
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
