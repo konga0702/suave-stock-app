@@ -82,17 +82,52 @@ export async function applyCompletedTransaction(
       await supabase.from('inventory_items').insert(inserts)
     }
   } else {
-    // 出庫: IN_STOCK個体をSHIPPEDに更新 (FIFO)
+    // 出庫: 管理番号指定がある場合は該当個体を優先してSHIPPEDに更新
+    const pickMatches = (
+      rows: Array<{ id: string; tracking_number: string | null; order_code: string | null; shipping_code: string | null }>,
+      code: string | null
+    ) => {
+      if (!code) return [] as typeof rows
+      return rows.filter(
+        (row) =>
+          row.tracking_number === code
+          || row.order_code === code
+          || row.shipping_code === code
+      )
+    }
+
     for (const item of items) {
       const { data: stockItems } = await supabase
         .from('inventory_items')
-        .select('id')
+        .select('id, tracking_number, order_code, shipping_code')
         .eq('product_id', item.product_id)
         .eq('status', 'IN_STOCK')
         .order('in_date', { ascending: true })
-        .limit(item.quantity)
+        .limit(Math.max(item.quantity * 3, item.quantity + 10))
 
       if (stockItems && stockItems.length > 0) {
+        let targetIds: string[] = []
+        const codeCandidates = [
+          ...pickMatches(stockItems, tx.tracking_number),
+          ...pickMatches(stockItems, tx.order_code),
+          ...pickMatches(stockItems, tx.shipping_code),
+        ]
+        const seen = new Set<string>()
+        const uniqueByCode = codeCandidates.filter((row) => {
+          if (seen.has(row.id)) return false
+          seen.add(row.id)
+          return true
+        })
+
+        if (tx.tracking_number || tx.order_code || tx.shipping_code) {
+          if (uniqueByCode.length < item.quantity) {
+            throw new Error('指定した管理番号の在庫が不足しています')
+          }
+          targetIds = uniqueByCode.slice(0, item.quantity).map((si) => si.id)
+        } else {
+          targetIds = stockItems.slice(0, item.quantity).map((si) => si.id)
+        }
+
         await supabase
           .from('inventory_items')
           .update({
@@ -102,7 +137,7 @@ export async function applyCompletedTransaction(
             shipping_code: tx.shipping_code || null,
             order_code: tx.order_code || null,
           })
-          .in('id', stockItems.map((si) => si.id))
+          .in('id', targetIds)
       }
     }
   }

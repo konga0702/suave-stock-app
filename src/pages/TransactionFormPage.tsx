@@ -192,6 +192,14 @@ export function TransactionFormPage() {
     setItems(items.filter((_, i) => i !== index))
   }
 
+  const matchesManagementCode = (
+    row: { tracking_number: string | null; order_code: string | null; shipping_code: string | null },
+    code: string
+  ): boolean =>
+    row.tracking_number === code
+    || row.order_code === code
+    || row.shipping_code === code
+
   const handleSave = async () => {
     if (items.length === 0) {
       toast.error('明細を追加してください')
@@ -200,6 +208,40 @@ export function TransactionFormPage() {
     if (!date) {
       toast.error('日付を入力してください')
       return
+    }
+    if (type === 'OUT') {
+      const selectedCode = trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
+      if (!selectedCode) {
+        toast.error('出庫時は管理番号を入力してください')
+        return
+      }
+
+      const productIds = [...new Set(items.map((item) => item.product_id))]
+      const { data: stockRows, error: stockErr } = await supabase
+        .from('inventory_items')
+        .select('id, product_id, tracking_number, order_code, shipping_code')
+        .in('product_id', productIds)
+        .eq('status', 'IN_STOCK')
+
+      if (stockErr) {
+        toast.error('在庫確認に失敗しました。時間をおいて再試行してください')
+        return
+      }
+
+      for (const item of items) {
+        const matchedCount = (stockRows ?? []).filter(
+          (row) => row.product_id === item.product_id && matchesManagementCode(row, selectedCode)
+        ).length
+
+        if (matchedCount === 0) {
+          toast.error(`管理番号「${selectedCode}」は在庫に存在しません`)
+          return
+        }
+        if (status === 'COMPLETED' && matchedCount < item.quantity) {
+          toast.error(`管理番号「${selectedCode}」の在庫数が不足しています（必要 ${item.quantity} / 在庫 ${matchedCount}）`)
+          return
+        }
+      }
     }
     setSaving(true)
     try {
