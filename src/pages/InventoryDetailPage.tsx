@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Package, ArrowDownToLine, ArrowUpFromLine, ChevronRight, Layers,
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
 import type { Product, InventoryItem } from '@/types/database'
 
 interface TxEntry {
@@ -47,69 +46,66 @@ export function InventoryDetailPage() {
   const [outEntries, setOutEntries] = useState<TxEntry[]>([])
   const [unitItems, setUnitItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [syncingCode, setSyncingCode] = useState<string | null>(null)
-
-  const loadDetail = useCallback(async () => {
-    if (!productId) return
-
-    // 商品情報
-    const { data: prod } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', productId)
-      .single()
-    if (prod) setProduct(prod)
-
-    // 入荷・出荷履歴・在庫個体を並列取得
-    const [{ data: inData }, { data: outData }, { data: unitData }] = await Promise.all([
-      supabase
-        .from('transaction_items')
-        .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
-        .eq('product_id', productId)
-        .eq('transaction.type' as string, 'IN')
-        .eq('transaction.status' as string, 'COMPLETED'),
-      supabase
-        .from('transaction_items')
-        .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
-        .eq('product_id', productId)
-        .eq('transaction.type' as string, 'OUT')
-        .eq('transaction.status' as string, 'COMPLETED'),
-      supabase
-        .from('inventory_items')
-        .select('*')
-        .eq('product_id', productId)
-        .eq('status', 'IN_STOCK')
-        .order('in_date', { ascending: false }),
-    ])
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mapEntry = (item: any): TxEntry => {
-      const tx = Array.isArray(item.transaction) ? item.transaction[0] : item.transaction
-      return {
-        txId:            tx?.id ?? '',
-        date:            tx?.date ?? '',
-        quantity:        item.quantity ?? 0,
-        price:           Number(item.price ?? 0),
-        partner_name:    tx?.partner_name ?? null,
-        tracking_number: tx?.tracking_number ?? null,
-        order_code:      tx?.order_code ?? null,
-        shipping_code:   tx?.shipping_code ?? null,
-        category:        tx?.category ?? null,
-      }
-    }
-
-    const sorted = (arr: TxEntry[]) =>
-      [...arr].sort((a, b) => b.date.localeCompare(a.date))
-
-    setInEntries(sorted((inData ?? []).map(mapEntry)))
-    setOutEntries(sorted((outData ?? []).map(mapEntry)))
-    setUnitItems((unitData ?? []) as InventoryItem[])
-    setLoading(false)
-  }, [productId])
 
   useEffect(() => {
-    loadDetail()
-  }, [loadDetail])
+    if (!productId) return
+    async function load() {
+      // 商品情報
+      const { data: prod } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single()
+      if (prod) setProduct(prod)
+
+      // 入荷・出荷履歴・在庫個体を並列取得
+      const [{ data: inData }, { data: outData }, { data: unitData }] = await Promise.all([
+        supabase
+          .from('transaction_items')
+          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
+          .eq('product_id', productId)
+          .eq('transaction.type' as string, 'IN')
+          .eq('transaction.status' as string, 'COMPLETED'),
+        supabase
+          .from('transaction_items')
+          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
+          .eq('product_id', productId)
+          .eq('transaction.type' as string, 'OUT')
+          .eq('transaction.status' as string, 'COMPLETED'),
+        supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('status', 'IN_STOCK')
+          .order('in_date', { ascending: false }),
+      ])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapEntry = (item: any): TxEntry => {
+        const tx = Array.isArray(item.transaction) ? item.transaction[0] : item.transaction
+        return {
+          txId:            tx?.id ?? '',
+          date:            tx?.date ?? '',
+          quantity:        item.quantity ?? 0,
+          price:           Number(item.price ?? 0),
+          partner_name:    tx?.partner_name ?? null,
+          tracking_number: tx?.tracking_number ?? null,
+          order_code:      tx?.order_code ?? null,
+          shipping_code:   tx?.shipping_code ?? null,
+          category:        tx?.category ?? null,
+        }
+      }
+
+      const sorted = (arr: TxEntry[]) =>
+        [...arr].sort((a, b) => b.date.localeCompare(a.date))
+
+      setInEntries(sorted((inData ?? []).map(mapEntry)))
+      setOutEntries(sorted((outData ?? []).map(mapEntry)))
+      setUnitItems((unitData ?? []) as InventoryItem[])
+      setLoading(false)
+    }
+    load()
+  }, [productId])
 
   const totalIn  = inEntries.reduce((s, e) => s + e.quantity, 0)
   const totalOut = outEntries.reduce((s, e) => s + e.quantity, 0)
@@ -190,54 +186,6 @@ export function InventoryDetailPage() {
   }
 
   const getCodeLinks = (code: string): CodeTransactionLinks => codeTxMap.get(code) ?? { inTxId: null, outTxId: null }
-
-  const handleSyncShippedByCode = async (row: ManagementCodeRow) => {
-    if (!productId) return
-    if (row.delta <= 0) return
-
-    const links = getCodeLinks(row.code)
-    if (!links.outTxId) {
-      toast.error('対応する出庫取引が見つからないため同期できません')
-      return
-    }
-
-    const ok = window.confirm(
-      `管理番号「${row.code}」の実在庫 ${row.delta} 件を出庫済みに同期します。よろしいですか？`
-    )
-    if (!ok) return
-
-    setSyncingCode(row.code)
-    try {
-      const targetUnits = unitItems
-        .filter((unit) => getUnitManagementCode(unit) === row.code)
-        .slice(0, row.delta)
-
-      if (targetUnits.length === 0) {
-        toast.error('同期対象の実在庫が見つかりませんでした')
-        return
-      }
-
-      const today = new Date().toISOString().slice(0, 10)
-      const { error: updateErr } = await supabase
-        .from('inventory_items')
-        .update({
-          status: 'SHIPPED',
-          out_transaction_id: links.outTxId,
-          out_date: today,
-        })
-        .in('id', targetUnits.map((u) => u.id))
-
-      if (updateErr) throw updateErr
-
-      toast.success(`${targetUnits.length}件を出庫済みに同期しました`)
-      await loadDetail()
-    } catch (error) {
-      console.error('[InventoryDetail] 同期エラー:', error)
-      toast.error('同期に失敗しました')
-    } finally {
-      setSyncingCode(null)
-    }
-  }
 
   if (loading) {
     return (
@@ -544,18 +492,6 @@ export function InventoryDetailPage() {
                               出庫取引
                               <ChevronRight className="h-3 w-3" />
                             </Link>
-                          )}
-                          {row.delta > 0 && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 rounded-lg px-2.5 text-[11px]"
-                              onClick={() => handleSyncShippedByCode(row)}
-                              disabled={syncingCode === row.code}
-                            >
-                              {syncingCode === row.code ? '同期中...' : '出庫済みに同期'}
-                            </Button>
                           )}
                         </div>
                       </div>
