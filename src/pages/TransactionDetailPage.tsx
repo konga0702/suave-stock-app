@@ -33,6 +33,20 @@ export function TransactionDetailPage() {
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [showRevertConfirm, setShowRevertConfirm] = useState(false)
 
+  const normalizeManagementCode = (value: string | null | undefined): string =>
+    (value ?? '')
+      .trim()
+      .replace(/[‐‑‒–—―ー−]/g, '-')
+      .toUpperCase()
+
+  const matchesManagementCode = (
+    row: { tracking_number: string | null; order_code: string | null; shipping_code: string | null },
+    code: string
+  ): boolean =>
+    normalizeManagementCode(row.tracking_number) === code
+    || normalizeManagementCode(row.order_code) === code
+    || normalizeManagementCode(row.shipping_code) === code
+
   useEffect(() => {
     if (!id) return
     async function load() {
@@ -64,28 +78,68 @@ export function TransactionDetailPage() {
     if (!tx || !id) return
     setProcessing(true)
     try {
-      await applyCompletedTransaction(
-        id,
-        {
-          type: tx.type,
-          date: tx.date,
-          tracking_number: tx.tracking_number ?? null,
-          order_code: tx.order_code ?? null,
-          shipping_code: tx.shipping_code ?? null,
-          partner_name: tx.partner_name ?? null,
-        },
-        items.map((item) => ({ product_id: item.product_id, quantity: item.quantity }))
-      )
+      let skipInventoryApplyForOut = false
+      const selectedInventoryIdsByProduct: Record<string, string[]> = {}
+      if (tx.type === 'OUT') {
+        const selectedCode = normalizeManagementCode(
+          tx.tracking_number ?? tx.order_code ?? tx.shipping_code ?? null
+        )
+        if (!selectedCode) {
+          toast.warning('管理番号が未設定のため、帳簿のみ完了に更新します')
+          skipInventoryApplyForOut = true
+        } else {
+          const productIds = [...new Set(items.map((item) => item.product_id))]
+          const { data: stockRows, error: stockErr } = await supabase
+            .from('inventory_items')
+            .select('id, product_id, tracking_number, order_code, shipping_code')
+            .in('product_id', productIds)
+            .eq('status', 'IN_STOCK')
+
+          if (stockErr) throw stockErr
+
+          for (const item of items) {
+            const matchedRows = (stockRows ?? []).filter(
+              (row) => row.product_id === item.product_id && matchesManagementCode(row, selectedCode)
+            )
+            selectedInventoryIdsByProduct[item.product_id] = matchedRows.map((row) => row.id)
+            if (matchedRows.length < item.quantity) {
+              skipInventoryApplyForOut = true
+              toast.warning(`管理番号「${selectedCode}」の在庫不足のため、帳簿のみ完了に更新します`)
+            }
+          }
+        }
+      }
+
+      if (!(tx.type === 'OUT' && skipInventoryApplyForOut)) {
+        await applyCompletedTransaction(
+          id,
+          {
+            type: tx.type,
+            date: tx.date,
+            tracking_number: tx.tracking_number ?? null,
+            order_code: tx.order_code ?? null,
+            shipping_code: tx.shipping_code ?? null,
+            partner_name: tx.partner_name ?? null,
+          },
+          items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+          selectedInventoryIdsByProduct
+        )
+      }
 
       await supabase
         .from('transactions')
         .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
         .eq('id', id)
 
-      toast.success('完了しました。在庫数と個体追跡を反映しました。')
+      if (tx.type === 'OUT' && skipInventoryApplyForOut) {
+        toast.success('完了しました（帳簿のみ更新・在庫個体は未同期）')
+      } else {
+        toast.success('完了しました。在庫数と個体追跡を反映しました。')
+      }
       setTx({ ...tx, status: 'COMPLETED' })
       setShowCompleteConfirm(false)
-    } catch {
+    } catch (error) {
+      console.error('[TransactionDetail] 完了処理エラー:', error)
       toast.error('完了処理に失敗しました')
     } finally {
       setProcessing(false)
