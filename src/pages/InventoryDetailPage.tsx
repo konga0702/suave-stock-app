@@ -17,7 +17,15 @@ interface TxEntry {
   partner_name: string | null
   tracking_number: string | null
   order_code: string | null
+  shipping_code: string | null
   category: string | null
+}
+
+interface ManagementCodeRow {
+  code: string
+  expectedQty: number
+  actualQty: number
+  delta: number
 }
 
 export function InventoryDetailPage() {
@@ -49,13 +57,13 @@ export function InventoryDetailPage() {
       const [{ data: inData }, { data: outData }, { data: unitData }] = await Promise.all([
         supabase
           .from('transaction_items')
-          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, category)')
+          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
           .eq('product_id', productId)
           .eq('transaction.type' as string, 'IN')
           .eq('transaction.status' as string, 'COMPLETED'),
         supabase
           .from('transaction_items')
-          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, category)')
+          .select('quantity, price, transaction:transactions!inner(id, date, type, status, partner_name, tracking_number, order_code, shipping_code, category)')
           .eq('product_id', productId)
           .eq('transaction.type' as string, 'OUT')
           .eq('transaction.status' as string, 'COMPLETED'),
@@ -78,6 +86,7 @@ export function InventoryDetailPage() {
           partner_name:    tx?.partner_name ?? null,
           tracking_number: tx?.tracking_number ?? null,
           order_code:      tx?.order_code ?? null,
+          shipping_code:   tx?.shipping_code ?? null,
           category:        tx?.category ?? null,
         }
       }
@@ -95,7 +104,55 @@ export function InventoryDetailPage() {
 
   const totalIn  = inEntries.reduce((s, e) => s + e.quantity, 0)
   const totalOut = outEntries.reduce((s, e) => s + e.quantity, 0)
-  const netStock = totalIn - totalOut
+  const ledgerNetStock = totalIn - totalOut
+
+  const getEntryManagementCode = (entry: TxEntry): string =>
+    entry.tracking_number?.trim()
+    || entry.order_code?.trim()
+    || entry.shipping_code?.trim()
+    || '（管理番号未設定）'
+
+  const getUnitManagementCode = (unit: InventoryItem): string =>
+    unit.tracking_number?.trim()
+    || unit.order_code?.trim()
+    || unit.shipping_code?.trim()
+    || '（管理番号未設定）'
+
+  const expectedMap = new Map<string, number>()
+  for (const entry of inEntries) {
+    const code = getEntryManagementCode(entry)
+    expectedMap.set(code, (expectedMap.get(code) ?? 0) + entry.quantity)
+  }
+  for (const entry of outEntries) {
+    const code = getEntryManagementCode(entry)
+    expectedMap.set(code, (expectedMap.get(code) ?? 0) - entry.quantity)
+  }
+
+  const actualMap = new Map<string, number>()
+  for (const unit of unitItems) {
+    const code = getUnitManagementCode(unit)
+    actualMap.set(code, (actualMap.get(code) ?? 0) + 1)
+  }
+
+  const ledgerRows = [...expectedMap.entries()]
+    .filter(([, qty]) => qty > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+
+  const mismatchRows: ManagementCodeRow[] = [...new Set([...expectedMap.keys(), ...actualMap.keys()])]
+    .map((code) => {
+      const expectedQty = expectedMap.get(code) ?? 0
+      const actualQty = actualMap.get(code) ?? 0
+      return {
+        code,
+        expectedQty,
+        actualQty,
+        delta: actualQty - expectedQty,
+      }
+    })
+    .filter((row) => row.delta !== 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.code.localeCompare(b.code))
+
+  const hasMismatch = mismatchRows.length > 0
 
   if (loading) {
     return (
@@ -174,8 +231,8 @@ export function InventoryDetailPage() {
         </Card>
         <Card
           className={`border-0 shadow-sm shadow-slate-200/50 dark:shadow-none cursor-pointer transition-all hover:ring-2 hover:ring-emerald-300 ${
-            netStock > 0 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' :
-            netStock < 0 ? 'bg-rose-50/60 dark:bg-rose-950/30' : ''
+            ledgerNetStock > 0 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' :
+            ledgerNetStock < 0 ? 'bg-rose-50/60 dark:bg-rose-950/30' : ''
           }`}
           onClick={() => setActiveTab('net')}
         >
@@ -185,10 +242,10 @@ export function InventoryDetailPage() {
               <p className="text-[10px] font-medium text-muted-foreground">純在庫</p>
             </div>
             <p className={`text-xl font-bold num-display ${
-              netStock > 0 ? 'text-emerald-600 dark:text-emerald-400' :
-              netStock < 0 ? 'text-rose-600 dark:text-rose-400' :
+              ledgerNetStock > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+              ledgerNetStock < 0 ? 'text-rose-600 dark:text-rose-400' :
               'text-slate-500'
-            }`}>{netStock}</p>
+            }`}>{ledgerNetStock}</p>
           </CardContent>
         </Card>
       </div>
@@ -221,7 +278,7 @@ export function InventoryDetailPage() {
               data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-emerald-500"
           >
             <Layers className="mr-1.5 h-3.5 w-3.5" />
-            純在庫 ({unitItems.length})
+            純在庫 ({ledgerNetStock})
           </TabsTrigger>
         </TabsList>
 
@@ -293,6 +350,79 @@ export function InventoryDetailPage() {
 
         {/* 純在庫（残在庫内訳）タブ */}
         <TabsContent value="net" className="mt-3 space-y-2">
+          <Card className="border border-border/50 shadow-sm rounded-2xl">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">帳簿純在庫</p>
+                  <p className="text-base font-bold num-display text-emerald-600 dark:text-emerald-400">{ledgerNetStock}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">実在庫</p>
+                  <p className="text-base font-bold num-display text-sky-600 dark:text-sky-400">{unitItems.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">不整合件数</p>
+                  <p className={`text-base font-bold num-display ${hasMismatch ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {mismatchRows.length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">帳簿上の純在庫（管理番号差分）</p>
+            {ledgerRows.length === 0 ? (
+              <Card className="border border-dashed rounded-2xl">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">管理番号差分で残っている純在庫はありません</p>
+                </CardContent>
+              </Card>
+            ) : (
+              ledgerRows.map(([code, qty]) => (
+                <Card
+                  key={`ledger-${code}`}
+                  className="border border-emerald-200/70 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm rounded-2xl"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{code}</p>
+                      <div className="rounded-xl px-3 py-2 text-center min-w-[58px] bg-emerald-100/70 dark:bg-emerald-900/50">
+                        <p className="text-[9px] font-medium text-muted-foreground/60 mb-0.5">帳簿</p>
+                        <p className="text-base font-bold num-display text-emerald-600 dark:text-emerald-400">{qty}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {hasMismatch && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">不整合（帳簿と実在庫の差分）</p>
+              {mismatchRows.map((row) => (
+                <Card
+                  key={`mismatch-${row.code}`}
+                  className="border border-rose-200/80 dark:border-rose-800/50 bg-rose-50/50 dark:bg-rose-950/20 shadow-sm rounded-2xl"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{row.code}</p>
+                      <div className="text-right text-xs">
+                        <p className="text-muted-foreground">帳簿 {row.expectedQty} / 実在庫 {row.actualQty}</p>
+                        <p className={`font-bold num-display ${row.delta > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {row.delta > 0 ? `実在庫 +${row.delta}` : `実在庫 ${row.delta}`}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {unitItems.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
@@ -301,7 +431,9 @@ export function InventoryDetailPage() {
               <p className="text-sm text-muted-foreground">純在庫（未出庫）の管理番号はありません</p>
             </div>
           ) : (
-            unitItems.map((unit) => (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">実在庫の管理番号（個体テーブル）</p>
+              {unitItems.map((unit) => (
               <Card
                 key={unit.id}
                 className="border border-emerald-200/70 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm rounded-2xl"
@@ -340,7 +472,8 @@ export function InventoryDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))
+              ))}
+            </div>
           )}
         </TabsContent>
       </Tabs>
