@@ -205,6 +205,20 @@ export function InventoryDetailPage() {
     return `/transactions/new?${params.toString()}`
   }
 
+  const buildAdjustmentInLink = (row: ManagementCodeRow): string => {
+    const params = new URLSearchParams({
+      type: 'IN',
+      status: 'COMPLETED',
+      category: '棚卸',
+      product_id: productId ?? '',
+      quantity: String(Math.max(1, Math.abs(row.delta))),
+    })
+    if (row.code !== '（管理番号未設定）') {
+      params.set('tracking_number', row.code)
+    }
+    return `/transactions/new?${params.toString()}`
+  }
+
   const handleSyncShippedByCode = async (row: ManagementCodeRow) => {
     if (!productId) return
     if (row.delta <= 0) return
@@ -559,26 +573,43 @@ export function InventoryDetailPage() {
                               <ChevronRight className="h-3 w-3" />
                             </Link>
                           )}
-                          {row.delta > 0 && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 rounded-lg px-2.5 text-[11px]"
-                              onClick={() => handleSyncShippedByCode(row)}
-                              disabled={syncingCode === row.code}
-                            >
-                              {syncingCode === row.code ? '同期中...' : '出庫済みに同期'}
-                            </Button>
-                          )}
-                          {row.delta < 0 && (
-                            <Link
-                              to={buildAdjustmentOutLink(row)}
-                              className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              調整出庫を作成
-                              <ChevronRight className="h-3 w-3" />
-                            </Link>
+                          {row.delta > 0 ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-lg px-2.5 text-[11px]"
+                                onClick={() => handleSyncShippedByCode(row)}
+                                disabled={syncingCode === row.code}
+                              >
+                                {syncingCode === row.code ? '同期中...' : '実物なし→出庫済みに同期'}
+                              </Button>
+                              <Link
+                                to={buildAdjustmentInLink(row)}
+                                className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                実物あり→調整入庫
+                                <ChevronRight className="h-3 w-3" />
+                              </Link>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                to={buildAdjustmentOutLink(row)}
+                                className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                実物なし→調整出庫
+                                <ChevronRight className="h-3 w-3" />
+                              </Link>
+                              <Link
+                                to={buildAdjustmentInLink(row)}
+                                className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                実物あり→調整入庫
+                                <ChevronRight className="h-3 w-3" />
+                              </Link>
+                            </>
                           )}
                         </div>
                       </div>
