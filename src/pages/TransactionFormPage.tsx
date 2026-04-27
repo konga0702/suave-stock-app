@@ -82,6 +82,7 @@ export function TransactionFormPage() {
   const [loadingData, setLoadingData] = useState(false)
   const [outCodeCandidates, setOutCodeCandidates] = useState<OutCodeCandidate[]>([])
   const [loadingOutCodes, setLoadingOutCodes] = useState(false)
+  const [prefillApplied, setPrefillApplied] = useState(false)
 
   useEffect(() => {
     supabase
@@ -143,6 +144,47 @@ export function TransactionFormPage() {
     }
     load().finally(() => setLoadingData(false))
   }, [id])
+
+  useEffect(() => {
+    if (isEdit || prefillApplied || products.length === 0) return
+
+    const prefillProductId = searchParams.get('product_id')
+    if (!prefillProductId) {
+      setPrefillApplied(true)
+      return
+    }
+
+    const product = products.find((p) => p.id === prefillProductId)
+    if (!product) {
+      setPrefillApplied(true)
+      return
+    }
+
+    const parsedQuantity = Number.parseInt(searchParams.get('quantity') ?? '1', 10)
+    const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1
+    const prefillTracking = searchParams.get('tracking_number')?.trim() ?? ''
+
+    const autoPrice = type === 'IN'
+      ? Number(product.cost_price ?? product.default_unit_price ?? 0)
+      : Number(product.selling_price ?? product.default_unit_price ?? 0)
+
+    setItems([
+      {
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.product_code ?? '',
+        product_image: product.image_url ?? null,
+        quantity,
+        price: autoPrice,
+      },
+    ])
+
+    if (prefillTracking) {
+      setTrackingNumber(prefillTracking)
+    }
+
+    setPrefillApplied(true)
+  }, [isEdit, prefillApplied, products, searchParams, type])
 
   // type変更時にcategoryリセット（初回マウント時はスキップ）
   const isFirstRender = useRef(true)
