@@ -48,6 +48,7 @@ export function InventoryDetailPage() {
   const [unitItems, setUnitItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [syncingCode, setSyncingCode] = useState<string | null>(null)
+  const [resolvingCode, setResolvingCode] = useState<string | null>(null)
 
   const loadDetail = useCallback(async () => {
     if (!productId) return
@@ -196,6 +197,7 @@ export function InventoryDetailPage() {
       type: 'OUT',
       status: 'COMPLETED',
       category: '廃棄',
+      adjust_mode: 'ledger_only',
       product_id: productId ?? '',
       quantity: String(Math.max(1, Math.abs(row.delta))),
     })
@@ -210,6 +212,7 @@ export function InventoryDetailPage() {
       type: 'IN',
       status: 'COMPLETED',
       category: '棚卸',
+      adjust_mode: 'ledger_only',
       product_id: productId ?? '',
       quantity: String(Math.max(1, Math.abs(row.delta))),
     })
@@ -264,6 +267,45 @@ export function InventoryDetailPage() {
       toast.error('同期に失敗しました')
     } finally {
       setSyncingCode(null)
+    }
+  }
+
+  const handleAddActualStockByCode = async (row: ManagementCodeRow) => {
+    if (!productId) return
+    if (row.delta >= 0) return
+    const qty = Math.abs(row.delta)
+
+    const ok = window.confirm(
+      `管理番号「${row.code}」の実在庫を ${qty} 件追加して不整合を解消します。よろしいですか？`
+    )
+    if (!ok) return
+
+    const links = getCodeLinks(row.code)
+    setResolvingCode(row.code)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const rows = Array.from({ length: qty }).map((_, idx) => ({
+        product_id: productId,
+        tracking_number:
+          row.code !== '（管理番号未設定）' ? row.code : `ADJ-${today}-${idx + 1}`,
+        order_code: null as string | null,
+        shipping_code: null as string | null,
+        status: 'IN_STOCK' as const,
+        in_transaction_id: links.inTxId,
+        in_date: today,
+        partner_name: null as string | null,
+      }))
+
+      const { error } = await supabase.from('inventory_items').insert(rows)
+      if (error) throw error
+
+      toast.success(`実在庫を ${qty} 件追加しました`)
+      await loadDetail()
+    } catch (error) {
+      console.error('[InventoryDetail] 実在庫追加エラー:', error)
+      toast.error('実在庫の追加に失敗しました')
+    } finally {
+      setResolvingCode(null)
     }
   }
 
@@ -589,7 +631,7 @@ export function InventoryDetailPage() {
                                 to={buildAdjustmentInLink(row)}
                                 className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
                               >
-                                実物あり→調整入庫
+                                実物あり→帳簿調整入庫
                                 <ChevronRight className="h-3 w-3" />
                               </Link>
                             </>
@@ -602,13 +644,16 @@ export function InventoryDetailPage() {
                                 実物なし→調整出庫
                                 <ChevronRight className="h-3 w-3" />
                               </Link>
-                              <Link
-                                to={buildAdjustmentInLink(row)}
-                                className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-lg px-2.5 text-[11px]"
+                                onClick={() => handleAddActualStockByCode(row)}
+                                disabled={resolvingCode === row.code}
                               >
-                                実物あり→調整入庫
-                                <ChevronRight className="h-3 w-3" />
-                              </Link>
+                                {resolvingCode === row.code ? '追加中...' : '実物あり→実在庫を追加'}
+                              </Button>
                             </>
                           )}
                         </div>
