@@ -92,7 +92,6 @@ export function InventoryDetailPage() {
         .from('inventory_items')
         .select('*')
         .eq('product_id', productId)
-        .eq('status', 'IN_STOCK')
         .order('in_date', { ascending: false }),
     ])
 
@@ -124,6 +123,9 @@ export function InventoryDetailPage() {
     loadDetail()
   }, [loadDetail])
 
+  const inStockItems = unitItems.filter((item) => item.status === 'IN_STOCK')
+  const shippedItems = unitItems.filter((item) => item.status === 'SHIPPED')
+
   const totalIn  = inEntries.reduce((s, e) => s + e.quantity, 0)
   const totalOut = outEntries.reduce((s, e) => s + e.quantity, 0)
   const ledgerNetStock = totalIn - totalOut
@@ -139,7 +141,7 @@ export function InventoryDetailPage() {
   }
 
   const actualMap = new Map<string, number>()
-  for (const unit of unitItems) {
+  for (const unit of inStockItems) {
     const code = getUnitManagementCode(unit)
     actualMap.set(code, (actualMap.get(code) ?? 0) + 1)
   }
@@ -172,7 +174,7 @@ export function InventoryDetailPage() {
     const links = ensureCodeTx(getEntryManagementCode(entry))
     if (!links.outTxId && entry.txId) links.outTxId = entry.txId
   }
-  for (const unit of unitItems) {
+  for (const unit of inStockItems) {
     const links = ensureCodeTx(getUnitManagementCode(unit))
     if (!links.inTxId && unit.in_transaction_id) links.inTxId = unit.in_transaction_id
     if (!links.outTxId && unit.out_transaction_id) links.outTxId = unit.out_transaction_id
@@ -231,7 +233,7 @@ export function InventoryDetailPage() {
 
     setSyncingCode(row.code)
     try {
-      const targets = unitItems
+      const targets = inStockItems
         .filter((u) => getUnitManagementCode(u) === row.code)
         .slice(0, row.delta)
       if (targets.length === 0) {
@@ -532,7 +534,7 @@ export function InventoryDetailPage() {
                 </div>
                 <div>
                   <p className="text-[11px] text-muted-foreground">実在庫</p>
-                  <p className="text-base font-bold num-display text-sky-600 dark:text-sky-400">{unitItems.length}</p>
+                  <p className="text-base font-bold num-display text-sky-600 dark:text-sky-400">{inStockItems.length}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-muted-foreground">不整合件数</p>
@@ -629,7 +631,7 @@ export function InventoryDetailPage() {
           )}
 
           <p className="px-1 text-xs font-semibold text-muted-foreground">実在庫の管理番号（個体テーブル）</p>
-          {unitItems.length === 0 ? (
+          {inStockItems.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center animate-fade-in">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
                 <Layers className="h-7 w-7 text-muted-foreground/40" />
@@ -637,7 +639,7 @@ export function InventoryDetailPage() {
               <p className="text-sm text-muted-foreground">純在庫（未出庫）の管理番号はありません</p>
             </div>
           ) : (
-            unitItems.map((unit) => (
+            inStockItems.map((unit) => (
               <Card
                 key={unit.id}
                 className="border border-emerald-200/70 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm rounded-2xl"
@@ -672,6 +674,84 @@ export function InventoryDetailPage() {
                         入庫取引
                         <ChevronRight className="h-3 w-3" />
                       </Link>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+
+          <p className="px-1 pt-3 text-xs font-semibold text-muted-foreground">Supabase個体データ（全件可視化）</p>
+          <Card className="border border-border/50 shadow-sm rounded-2xl">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">総個体数</p>
+                  <p className="text-base font-bold num-display">{unitItems.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">IN_STOCK</p>
+                  <p className="text-base font-bold num-display text-emerald-600 dark:text-emerald-400">{inStockItems.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">SHIPPED</p>
+                  <p className="text-base font-bold num-display text-amber-600 dark:text-amber-400">{shippedItems.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {unitItems.length === 0 ? (
+            <Card className="border border-dashed rounded-2xl">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">個体データがありません</p>
+              </CardContent>
+            </Card>
+          ) : (
+            unitItems.map((unit) => (
+              <Card key={`all-${unit.id}`} className="border border-border/50 shadow-sm rounded-2xl">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs text-muted-foreground truncate">{unit.id}</p>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                      unit.status === 'IN_STOCK'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                    }`}>
+                      {unit.status}
+                    </span>
+                  </div>
+                  <p className="font-mono text-sm font-bold text-violet-600 dark:text-violet-400 truncate">
+                    {getUnitManagementCode(unit)}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                    <p>入庫日: {unit.in_date ?? '-'}</p>
+                    <p>出庫日: {unit.out_date ?? '-'}</p>
+                    <p className="truncate">order: {unit.order_code ?? '-'}</p>
+                    <p className="truncate">shipping: {unit.shipping_code ?? '-'}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {unit.in_transaction_id ? (
+                      <Link
+                        to={`/transactions/${unit.in_transaction_id}`}
+                        className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        入庫取引
+                        <ChevronRight className="h-3 w-3" />
+                      </Link>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">入庫取引: なし</span>
+                    )}
+                    {unit.out_transaction_id ? (
+                      <Link
+                        to={`/transactions/${unit.out_transaction_id}`}
+                        className="shrink-0 flex items-center gap-1 rounded-lg bg-white dark:bg-white/10 border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        出庫取引
+                        <ChevronRight className="h-3 w-3" />
+                      </Link>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">出庫取引: なし</span>
                     )}
                   </div>
                 </CardContent>
