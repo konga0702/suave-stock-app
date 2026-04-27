@@ -192,13 +192,19 @@ export function TransactionFormPage() {
     setItems(items.filter((_, i) => i !== index))
   }
 
+  const normalizeManagementCode = (value: string | null | undefined): string =>
+    (value ?? '')
+      .trim()
+      .replace(/[‐‑‒–—―ー−]/g, '-')
+      .toUpperCase()
+
   const matchesManagementCode = (
     row: { tracking_number: string | null; order_code: string | null; shipping_code: string | null },
     code: string
   ): boolean =>
-    row.tracking_number === code
-    || row.order_code === code
-    || row.shipping_code === code
+    normalizeManagementCode(row.tracking_number) === code
+    || normalizeManagementCode(row.order_code) === code
+    || normalizeManagementCode(row.shipping_code) === code
 
   const handleSave = async () => {
     if (items.length === 0) {
@@ -210,7 +216,9 @@ export function TransactionFormPage() {
       return
     }
     if (type === 'OUT') {
-      const selectedCode = trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
+      const selectedCode = normalizeManagementCode(
+        trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
+      )
       if (!selectedCode) {
         toast.error('出庫時は管理番号を入力してください')
         return

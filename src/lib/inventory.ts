@@ -83,16 +83,23 @@ export async function applyCompletedTransaction(
     }
   } else {
     // 出庫: 管理番号指定がある場合は該当個体を優先してSHIPPEDに更新
+    const normalizeManagementCode = (value: string | null | undefined): string =>
+      (value ?? '')
+        .trim()
+        .replace(/[‐‑‒–—―ー−]/g, '-')
+        .toUpperCase()
+
     const pickMatches = (
       rows: Array<{ id: string; tracking_number: string | null; order_code: string | null; shipping_code: string | null }>,
       code: string | null
     ) => {
-      if (!code) return [] as typeof rows
+      const normalizedCode = normalizeManagementCode(code)
+      if (!normalizedCode) return [] as typeof rows
       return rows.filter(
         (row) =>
-          row.tracking_number === code
-          || row.order_code === code
-          || row.shipping_code === code
+          normalizeManagementCode(row.tracking_number) === normalizedCode
+          || normalizeManagementCode(row.order_code) === normalizedCode
+          || normalizeManagementCode(row.shipping_code) === normalizedCode
       )
     }
 
