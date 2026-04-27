@@ -206,6 +206,8 @@ export function TransactionFormPage() {
     || normalizeManagementCode(row.order_code) === code
     || normalizeManagementCode(row.shipping_code) === code
 
+  const isPlaceholderManagementCode = (code: string): boolean => code === 'TBD'
+
   const handleSave = async () => {
     if (items.length === 0) {
       toast.error('明細を追加してください')
@@ -217,10 +219,14 @@ export function TransactionFormPage() {
     }
     let skipInventoryApplyForOut = false
     const selectedInventoryIdsByProduct: Record<string, string[]> = {}
+    const selectedCode = normalizeManagementCode(
+      trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
+    )
+    if (status === 'COMPLETED' && isPlaceholderManagementCode(selectedCode)) {
+      toast.error('管理番号がTBDのため完了登録できません。実管理番号に更新してください')
+      return
+    }
     if (type === 'OUT') {
-      const selectedCode = normalizeManagementCode(
-        trackingNumber.trim() || orderCode.trim() || shippingCode.trim()
-      )
       if (!selectedCode) {
         toast.warning('管理番号が未入力のため、帳簿のみ保存します')
         skipInventoryApplyForOut = true

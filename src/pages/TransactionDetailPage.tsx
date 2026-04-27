@@ -47,6 +47,8 @@ export function TransactionDetailPage() {
     || normalizeManagementCode(row.order_code) === code
     || normalizeManagementCode(row.shipping_code) === code
 
+  const isPlaceholderManagementCode = (code: string): boolean => code === 'TBD'
+
   useEffect(() => {
     if (!id) return
     async function load() {
@@ -78,12 +80,18 @@ export function TransactionDetailPage() {
     if (!tx || !id) return
     setProcessing(true)
     try {
+      const selectedCode = normalizeManagementCode(
+        tx.tracking_number ?? tx.order_code ?? tx.shipping_code ?? null
+      )
+      if (isPlaceholderManagementCode(selectedCode)) {
+        toast.error('管理番号がTBDのため完了できません。実管理番号に更新してください')
+        setShowCompleteConfirm(false)
+        return
+      }
+
       let skipInventoryApplyForOut = false
       const selectedInventoryIdsByProduct: Record<string, string[]> = {}
       if (tx.type === 'OUT') {
-        const selectedCode = normalizeManagementCode(
-          tx.tracking_number ?? tx.order_code ?? tx.shipping_code ?? null
-        )
         if (!selectedCode) {
           toast.warning('管理番号が未設定のため、帳簿のみ完了に更新します')
           skipInventoryApplyForOut = true
